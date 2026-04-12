@@ -4,10 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Services;
+using OwnStream.Services.JobArguments;
 
 namespace OwnStream.Controllers;
 
-public class WebhookController(ILogger<WebhookController> logger, DatabaseContext db) : Controller
+public class WebhookController(
+	ILogger<WebhookController> logger,
+	DatabaseContext db,
+	IFfmpegJobQueueService queueService) : Controller
 {
 	[Authorize]
 	public IActionResult Index() => View(db.Webhooks.ToArray());
@@ -48,7 +53,7 @@ public class WebhookController(ILogger<WebhookController> logger, DatabaseContex
 	[Route("/api/webhook/{id:guid}/radarr")]
 	public IActionResult HandleRadarr([FromRoute] Guid id, [FromBody] RadarrWebhookBody body)
 	{
-		DatabaseWebhook? webhook = db.Webhooks.Find(id);
+		DatabaseWebhook? webhook = db.Webhooks.Include(x => x.Library).FirstOrDefault(x => x.Id == id);
 		if (webhook == null) return NotFound();
 
 		if (webhook.Authentication.Length > 0)
@@ -63,6 +68,7 @@ public class WebhookController(ILogger<WebhookController> logger, DatabaseContex
 			logger.LogInformation("Test webhook received from {Name}", webhook.Name);
 			return Ok();
 		}
+
 		if (body.Type != "Download")
 		{
 			logger.LogWarning(
@@ -74,6 +80,37 @@ public class WebhookController(ILogger<WebhookController> logger, DatabaseContex
 		logger.LogInformation(
 			"Webhook received from {Name}, will import file at {Path} with metadata provider IDs imdbId={ImdbId}, tmdbId={TmdbId}",
 			webhook.Name, body.MovieFile.Path, body.RemoteMovie.ImdbId, body.RemoteMovie.TmdbId);
+
+		Guid videoId = Guid.NewGuid();
+		queueService.EnqueueAsync("TranscodeFull", body.MovieFile.Path,
+			Path.Join(webhook.Library.Path, videoId.ToString()),
+			new TranscodeJobArguments
+			{
+				// TODO: Get from settings
+				VideoId = videoId,
+				Resolutions =
+				[
+					new TranscodeJobArguments.ResolutionInfo
+						{ Name = "360p", Width = 640, Bitrate = 3000000, Codec = "h264_nvenc" },
+					new TranscodeJobArguments.ResolutionInfo
+						{ Name = "720p", Width = 1280, Bitrate = 7000000, Codec = "h264_nvenc" },
+					new TranscodeJobArguments.ResolutionInfo
+						{ Name = "1080p", Width = 1920, Bitrate = 15000000, Codec = "hevc_nvenc" }
+				],
+				AudioResolutions =
+				[
+					new TranscodeJobArguments.AudioResolutionInfo { Bitrate = 128000, Channels = 2, Codec = "aac" }
+				],
+				DeleteAfterTranscode = webhook.DeleteOnConvert,
+				Metadata = new Dictionary<string, string>()
+				{
+					["type"] = "movie",
+					["season"] = "1",
+					["episode"] = "1",
+					["imdbid"] = body.RemoteMovie.ImdbId,
+					["tmdbid"] = body.RemoteMovie.TmdbId.ToString()
+				}
+			});
 
 		return Ok();
 	}

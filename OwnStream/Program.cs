@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using OwnStream;
 using OwnStream.Database;
+using OwnStream.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,8 @@ builder.Services.AddAuthentication(options =>
 	})
 	.AddCookie("Cookies", options => { options.LoginPath = "/Auth/Login"; });
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
+builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 
 WebApplication app = builder.Build();
 

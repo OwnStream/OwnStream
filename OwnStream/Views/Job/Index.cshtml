@@ -1,0 +1,75 @@
+@using Humanizer
+@using OwnStream.Database.Models
+@model OwnStream.Database.Models.DatabaseFfmpegJob[]
+
+@{
+	ViewBag.Title = "Jobs";
+	Layout = "_Layout";
+}
+
+<h2>Jobs</h2>
+
+<table class="table table-hover">
+	<thead>
+	<tr>
+		<td>ID</td>
+		<td>Job Type</td>
+		<td>Status</td>
+		<td>Message</td>
+		<td>Times</td>
+		<td>Actions</td>
+	</tr>
+	</thead>
+	<tbody>
+	@foreach (DatabaseFfmpegJob job in Model)
+	{
+		<tr>
+			<td><code>@job.Id.ToString()</code></td>
+			<td>@job.JobType</td>
+			<td>@job.Status.ToString()</td>
+			@{
+				if (job.Message?.StartsWith("%") == true)
+				{
+					<td>
+						@job.Message
+						<div class="progress" role="progressbar" aria-label="Disk usage" aria-valuenow="@job.Message.Replace("%", "")"
+						     aria-valuemin="0" aria-valuemax="100" style="display: inline-block;width: 200px;">
+							<div class="progress-bar" style="width: @job.Message.Replace("%", "")%"></div>
+						</div>
+					</td>
+				}
+				else
+				{
+					<td>@job.Message</td>
+				}
+			}
+			@{
+				switch (job.Status)
+				{
+					case DatabaseFfmpegJob.JobStatus.Pending:
+						<td>Created @job.CreatedAt.Humanize()</td>
+						break;
+					case DatabaseFfmpegJob.JobStatus.Starting:
+						<td>Initializing now...</td>
+						break;
+					case DatabaseFfmpegJob.JobStatus.Processing:
+						<td>Running since @job.StartedAt.Humanize()</td>
+						break;
+					case DatabaseFfmpegJob.JobStatus.Completed:
+						<td>Completed @job.CompletedAt.Humanize()</td>
+						break;
+					case DatabaseFfmpegJob.JobStatus.Failed:
+						<td>Failed @job.CompletedAt.Humanize()</td>
+						break;
+				}
+			}
+			<td>
+				@if (job.Status is DatabaseFfmpegJob.JobStatus.Completed or DatabaseFfmpegJob.JobStatus.Failed)
+				{
+					<a asp-action="Requeue" asp-route-id="@job.Id" class="btn btn-danger">Restart</a>
+				}
+			</td>
+		</tr>
+	}
+	</tbody>
+</table>

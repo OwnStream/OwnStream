@@ -10,6 +10,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseVideo> Videos { get; set; }
 	public DbSet<DatabaseLibrary> Libraries { get; set; }
 	public DbSet<DatabaseWebhook> Webhooks { get; set; }
+	public DbSet<DatabaseFfmpegJob> FfmpegJobs { get; set; }
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 	{
