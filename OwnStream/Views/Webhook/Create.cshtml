@@ -1,0 +1,34 @@
+@using Humanizer
+@using OwnStream.Database.Models
+@model OwnStream.Database.Models.DatabaseLibrary[]
+
+@{
+	ViewBag.Title = "Create Webhook";
+	Layout = "_Layout";
+}
+
+<h2>Create Webhook</h2>
+<form method="post">
+	<div class="mb-3">
+		<label for="name" class="form-label">Name</label>
+		<input type="text" class="form-control" id="name" name="name" placeholder="*arr">
+	</div>
+	<select name="libraryId" class="form-select" aria-label="Default select example">
+		<option selected disabled>Library</option>
+		@foreach (DatabaseLibrary library in Model)
+		{
+			<option value="@library.Id">@library.Name - @library.Path - @library.GetSpaceInfo().Available.Bytes() free</option>
+		}
+	</select>
+	<div class="mb-3">
+		<label for="authentication" class="form-label">Authentication</label>
+		<input type="text" class="form-control" id="authentication" name="authentication" placeholder="Leave blank for none. Use 'username:password' for HTTP Basic authentication.">
+	</div>
+	<div class="form-check">
+		<input class="form-check-input" type="checkbox" name="deleteOnConvert" value="" id="deleteOnConvert" checked>
+		<label class="form-check-label" for="deleteOnConvert">
+			Delete source media after transcoding
+		</label>
+	</div>
+	<input type="submit" class="btn btn-primary" value="Create webhook"/>
+</form>

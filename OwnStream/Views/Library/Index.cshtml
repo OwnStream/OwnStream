@@ -1,0 +1,17 @@
+@using OwnStream.Database.Models
+@model OwnStream.Database.Models.DatabaseLibrary[]
+
+@{
+	ViewBag.Title = "Libraries";
+	Layout = "_Layout";
+}
+
+<h2>Libraries</h2>
+<a href="/Library/Create" class="btn btn-primary">Create new library</a>
+
+<ul>
+	@foreach (DatabaseLibrary library in Model)
+	{
+		<li><a href="/Library/Detail/@library.Id">@library.Name</a></li>
+	}
+</ul>
