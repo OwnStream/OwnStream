@@ -1,0 +1,19 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using OwnStream.Database;
+using OwnStream.Database.Models;
+
+namespace OwnStream.Controllers;
+
+[Authorize]
+public class VideoController(DatabaseContext db) : Controller
+{
+	public IActionResult Index() => View(db.Videos.ToArray());
+
+	public IActionResult Watch(Guid id)
+	{
+		DatabaseVideo? video = db.Videos.Find(id);
+		if (video == null) return RedirectToAction(nameof(Index));
+		return View(video);
+	}
+}

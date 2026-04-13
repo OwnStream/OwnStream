@@ -1,0 +1,60 @@
+@model OwnStream.Database.Models.DatabaseVideo
+
+@{
+	ViewBag.Title = "Watch";
+	Layout = "_Layout";
+}
+
+<h2>Watch</h2>
+<link href="~/lib/ltplayer/ltplayer.min.css" rel="stylesheet">
+<script src="~/lib/ltplayer/ltplayer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<style>
+	.ltp-controls-button > svg,
+	.ltp-controls-volume-icon > svg
+	{
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		fill: none;
+	}
+</style>
+<video
+	id="my-player"
+	class="video-js"
+	controls
+	preload="auto"
+	data-setup="{}">
+	<source src="/Media/@Model.Id/master.m3u8" type="application/x-mpegURL"/>
+	<p class="vjs-no-js">
+		To view this video please enable JavaScript, and consider upgrading to a
+		web browser that
+		<a href="https://videojs.com/html5-video-support/" target="_blank">
+			supports HTML5 video
+		</a>
+	</p>
+</video>
+
+<script>
+	const player = new Player("video", {
+		author: {
+			icon: "URL of the author icon",
+			title: "Name of the video author",
+			href: "Link to the author's website"
+		},
+		title: "Title of the video",
+		buttons: {
+			play: '<svg><use href="/lib/feather-icons/feather-sprite.svg#play"/></svg>',
+			pause: '<svg><use href="/lib/feather-icons/feather-sprite.svg#pause"/></svg>',
+			volumeMute: '<svg><use href="/lib/feather-icons/feather-sprite.svg#volume-x"/></svg>',
+			volumeLow: '<svg><use href="/lib/feather-icons/feather-sprite.svg#volume"/></svg>',
+			volumeMedium: '<svg><use href="/lib/feather-icons/feather-sprite.svg#volume-1"/></svg>',
+			volumeHigh: '<svg><use href="/lib/feather-icons/feather-sprite.svg#volume-2"/></svg>',
+			settings: '<svg><use href="/lib/feather-icons/feather-sprite.svg#settings"/></svg>',
+			fullscreen: '<svg><use href="/lib/feather-icons/feather-sprite.svg#maximize"/></svg>',
+			minimize: '<svg><use href="/lib/feather-icons/feather-sprite.svg#minimize"/></svg>'
+		},
+		hlsManifest: "/Media/@Model.Id/master.m3u8"
+	}, "hls.js");
+</script>
