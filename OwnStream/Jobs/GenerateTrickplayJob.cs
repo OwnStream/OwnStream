@@ -56,7 +56,7 @@ public class GenerateTrickplayJob : IJob
 				DateTimeOffset now = DateTimeOffset.UtcNow;
 				if (!((now - lastProgressUpdate).TotalSeconds >= 1)) return;
 				lastProgressUpdate = now;
-				job.Message = "%" + eventArgs.Percent;
+				job.Message = "%" + (eventArgs.Percent / 2);
 				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 				await db.SaveChangesAsync(cancellationToken);
 			};
@@ -109,7 +109,7 @@ public class GenerateTrickplayJob : IJob
 				DateTimeOffset now = DateTimeOffset.UtcNow;
 				if (!((now - lastProgressUpdate).TotalSeconds >= 1)) return;
 				lastProgressUpdate = now;
-				job.Message = "%" + eventArgs.Percent;
+				job.Message = "%" + ((eventArgs.Percent / 2) + 50);
 				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 				await db.SaveChangesAsync(cancellationToken);
 			};
