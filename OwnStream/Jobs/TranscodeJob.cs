@@ -170,17 +170,23 @@ public class TranscodeJob : IJob
 			}
 		}
 
-		if (args.DeleteAfterTranscode)
+		DatabaseFfmpegJob trickplayJob = new()
 		{
-			try
+			Id = Guid.NewGuid(),
+			JobType = "GenerateTrickplay",
+			InputPath = job.InputPath,
+			OutputPath = job.OutputPath,
+			Arguments = JsonSerializer.Serialize(new GenerateTrickplayJob.Arguments
 			{
-				File.Delete(job.InputPath);
-			}
-			catch (Exception)
-			{
-				// Ignored
-			}
-		}
+				DeleteAfterTranscode = args.DeleteAfterTranscode,
+				VideoId = args.VideoId,
+				LibraryId = args.LibraryId
+			}),
+			Status = DatabaseFfmpegJob.JobStatus.Pending,
+			CreatedAt = DateTimeOffset.UtcNow,
+		};
+		db.FfmpegJobs.Add(trickplayJob);
+		await db.SaveChangesAsync(cancellationToken);
 
 		DatabaseVideo dbVideo = new()
 		{

@@ -5,5 +5,5 @@ namespace OwnStream.Jobs;
 public interface IJob
 {
 	public void Initialize(IServiceProvider serviceProvider);
-	public Task ExecuteJob(Guid job, CancellationToken cancellationToken);
+	public Task ExecuteJob(Guid jobId, CancellationToken cancellationToken);
 }

@@ -80,6 +80,7 @@ public class FfmpegJobBackgroundService(IServiceScopeFactory scopeFactory, ILogg
 			IJob ijob = job.JobType switch
 			{
 				"TranscodeFull" => new TranscodeJob(),
+				"GenerateTrickplay" => new GenerateTrickplayJob(),
 				_ => throw new Exception($"Unexpected job type '{job.JobType}'")
 			};
 
