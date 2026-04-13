@@ -86,7 +86,7 @@ public class TranscodeJob : IJob
 				conv.AddParameter($"-b:a:{audioIndex} {res.Bitrate}");
 				conv.AddParameter($"-acodec:a:{audioIndex} {res.Codec}");
 				conv.AddParameter($"-ac:a:{audioIndex} {res.Channels}");
-				audioStreams.Add(audioIndex, audio.Language);
+				audioStreams.Add(audioIndex, audio.Language + "|" + audio.Title);
 			}
 		}
 
@@ -95,8 +95,14 @@ public class TranscodeJob : IJob
 			streamMap.Append("v:").Append(index).Append(",agroup:aud,name:").Append(name).Append(' ');
 		foreach ((int index, string name) in audioStreams)
 		{
-			streamMap.Append("a:").Append(index).Append(",agroup:aud,language:").Append(name)
-				.Append(",name:").Append(name);
+			string[] parts = name.Split('|', 2);
+			string title = name.Length switch
+			{
+				2 => parts[1],
+				_ => parts[0]
+			};
+			streamMap.Append("a:").Append(index).Append(",agroup:aud,language:").Append(parts[1])
+				.Append(",name:").Append(title);
 			if (index == 0) streamMap.Append(",default:yes");
 			streamMap.Append(' ');
 		}
