@@ -19,14 +19,24 @@
 		stroke-linejoin: round;
 		fill: none;
 	}
+	
+	.ltp-root {
+		min-height: 500px;
+	}
+	
+	.libassjs-canvas-parent, video {
+		position: absolute !important;
+		left: 0 !important;
+		right: 0 !important;
+		width: 100%;
+		height: 100%;
+	}
+
+	.libassjs-canvas-parent, .libassjs-canvas-parent > canvas {
+		pointer-events: none;
+	}
 </style>
-<video
-	id="my-player"
-	class="video-js"
-	controls
-	preload="auto"
-	data-setup="{}">
-	<source src="/Media/@Model.Id/master.m3u8" type="application/x-mpegURL"/>
+<video>
 	<p class="vjs-no-js">
 		To view this video please enable JavaScript, and consider upgrading to a
 		web browser that
@@ -36,14 +46,39 @@
 	</p>
 </video>
 
-<script>
-	async function loadVideo() {
-		const subtitlesResp = await fetch("/Media/@Model.Id/subtitles.json");
-		let subs = [];
-		if (subtitlesResp.ok) {
-			const subtitles = await subtitlesResp.json();
-			subs.push(...subtitles);
-		}
+@if (Context.Request.Query.ContainsKey("useAss"))
+{ 
+	<script src="~/lib/subtitlesoctopus/subtitles-octopus.js"></script>
+	<script>
+	function setSubs(subs)
+	{
+		if (subs.length === 0) return;
+		return () => {
+			window.SubtitlesOctopusOnLoad = function () {
+				const sub = subs[0];
+				const options = {
+					video: window.player.player,
+					subUrl: `/Media/@Model.Id/captions/${sub.files.ass}`,
+					//fonts: ['/JavascriptSubtitlesOctopus/fonts/Arial.ttf', '/JavascriptSubtitlesOctopus/fonts/TimesNewRoman.ttf'],
+					//onReady: onReadyFunction,
+					//debug: true,
+					workerUrl: '/lib/subtitlesoctopus/subtitles-octopus-worker.js',
+					fallbackFont: '/lib/subtitlesoctopus/default.woff2'
+				};
+				window.octopusInstance = new SubtitlesOctopus(options); // You can experiment in console
+			};
+			if (SubtitlesOctopus) {
+				SubtitlesOctopusOnLoad();
+			}
+		};
+	}
+	</script>
+}
+else
+{
+	<script>
+	function setSubs(subs)
+	{
 		subs.forEach(sub => {
 			if (sub.files.vtt === undefined) return;
 			const track = document.createElement("track");
@@ -53,6 +88,18 @@
 			track.setAttribute("kind", "subtitles");
 			document.querySelector("video").appendChild(track);
 		});
+	}
+	</script>
+}
+<script>
+	async function loadVideo() {
+		const subtitlesResp = await fetch("/Media/@Model.Id/subtitles.json");
+		let subs = [];
+		if (subtitlesResp.ok) {
+			const subtitles = await subtitlesResp.json();
+			subs.push(...subtitles);
+		}
+		const callback = setSubs(subs);
 		window.player = new Player("video", {
 			author: {
 				icon: "URL of the author icon",
@@ -78,6 +125,7 @@
 			hlsManifest: "/Media/@Model.Id/master.m3u8"
 		}, "hls.js");
 		window.player = player;
+		if (callback) callback();
 	}
 	loadVideo();
 </script>
