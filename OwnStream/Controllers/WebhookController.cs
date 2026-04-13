@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Jobs;
 using OwnStream.Services;
-using OwnStream.Services.JobArguments;
 
 namespace OwnStream.Controllers;
 
@@ -84,22 +84,23 @@ public class WebhookController(
 		Guid videoId = Guid.NewGuid();
 		queueService.EnqueueAsync("TranscodeFull", body.MovieFile.Path,
 			Path.Join(webhook.Library.Path, videoId.ToString()),
-			new TranscodeJobArguments
+			new TranscodeJob.Arguments
 			{
-				// TODO: Get from settings
 				VideoId = videoId,
+				LibraryId = webhook.LibraryId,
+				// TODO: Get from settings
 				Resolutions =
 				[
-					new TranscodeJobArguments.ResolutionInfo
+					new TranscodeJob.Arguments.ResolutionInfo
 						{ Name = "360p", Width = 640, Bitrate = 3000000, Codec = "h264_nvenc" },
-					new TranscodeJobArguments.ResolutionInfo
+					new TranscodeJob.Arguments.ResolutionInfo
 						{ Name = "720p", Width = 1280, Bitrate = 7000000, Codec = "h264_nvenc" },
-					new TranscodeJobArguments.ResolutionInfo
+					new TranscodeJob.Arguments.ResolutionInfo
 						{ Name = "1080p", Width = 1920, Bitrate = 15000000, Codec = "hevc_nvenc" }
 				],
 				AudioResolutions =
 				[
-					new TranscodeJobArguments.AudioResolutionInfo { Bitrate = 128000, Channels = 2, Codec = "aac" }
+					new TranscodeJob.Arguments.AudioResolutionInfo { Bitrate = 128000, Channels = 2, Codec = "aac" }
 				],
 				DeleteAfterTranscode = webhook.DeleteOnConvert,
 				Metadata = new Dictionary<string, string>()

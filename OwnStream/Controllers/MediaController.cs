@@ -27,4 +27,45 @@ public class MediaController(DatabaseContext db) : Controller
 		if (System.IO.File.Exists(path)) return PhysicalFile(path, mime);
 		return NotFound();
 	}
+
+	[Route("/Media/{id:guid}/subtitles.json")]
+	public IActionResult Subtitles(Guid id)
+	{
+		DatabaseVideo? video = db.Videos.Include(x => x.Library)
+			.FirstOrDefault(x => x.Id == id);
+		if (video == null) return NotFound();
+		string subtitlesDir = Path.Join(video.Library.Path, video.Id.ToString(), "captions");
+		if (!Directory.Exists(subtitlesDir)) return NotFound();
+		SubtitleFile[] subtitles = Directory.GetFiles(subtitlesDir)
+			.Select(x => x.Split("/").Last())
+			.GroupBy(x => string.Join("", x.Split('.').SkipLast(1)))
+			.Select(x =>
+			{
+				// eng.English.default.3.vtt
+				List<string> parts = x.First().Split(".").ToList();
+				string lang = parts[0];
+				string title = parts[1];
+				parts = parts.Skip(2).ToList();
+				return new SubtitleFile
+				{
+					Id = int.Parse(parts[^2]),
+					Files = x.ToDictionary(e => e.Split('.')[^1], e => e),
+					Default = parts.Contains("default"),
+					Forced = parts.Contains("forced"),
+					Language = lang,
+					Title = title
+				};
+			}).ToArray();
+		return Json(subtitles);
+	}
+
+	public class SubtitleFile
+	{
+		public int Id { get; set; }
+		public Dictionary<string, string> Files { get; set; }
+		public bool Default { get; set; }
+		public bool Forced { get; set; }
+		public string Language { get; set; }
+		public string Title { get; set; }
+	}
 }

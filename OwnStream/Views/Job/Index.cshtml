@@ -34,7 +34,7 @@
 						@job.Message
 						<div class="progress" role="progressbar" aria-label="Disk usage" aria-valuenow="@job.Message.Replace("%", "")"
 						     aria-valuemin="0" aria-valuemax="100" style="display: inline-block;width: 200px;">
-							<div class="progress-bar" style="width: @job.Message.Replace("%", "")%"></div>
+							<div class="progress-bar h-100" style="width: @job.Message.Replace("%", "")%"></div>
 						</div>
 					</td>
 				}
@@ -56,10 +56,16 @@
 						<td>Running since @job.StartedAt.Humanize()</td>
 						break;
 					case DatabaseFfmpegJob.JobStatus.Completed:
-						<td>Completed @job.CompletedAt.Humanize()</td>
+						<td>
+							Completed @job.CompletedAt.Humanize()<br/>
+							Took @(((job.CompletedAt ?? DateTimeOffset.UnixEpoch) - (job.StartedAt ?? DateTimeOffset.UnixEpoch)).Humanize())
+						</td>
 						break;
 					case DatabaseFfmpegJob.JobStatus.Failed:
-						<td>Failed @job.CompletedAt.Humanize()</td>
+						<td>
+							Failed @job.CompletedAt.Humanize()<br/>
+							Took @(((job.CompletedAt ?? DateTimeOffset.UnixEpoch) - (job.StartedAt ?? DateTimeOffset.UnixEpoch)).Humanize())
+						</td>
 						break;
 				}
 			}

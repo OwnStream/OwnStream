@@ -8,7 +8,7 @@ namespace OwnStream.Controllers;
 [Authorize]
 public class JobController(DatabaseContext db) : Controller
 {
-	public IActionResult Index() => View(db.FfmpegJobs.ToArray());
+	public IActionResult Index() => View(db.FfmpegJobs.OrderBy(x => x.Status).ThenBy(x => x.CreatedAt).ToArray());
 
 	public IActionResult Requeue(Guid id)
 	{
