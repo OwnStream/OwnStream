@@ -79,3 +79,19 @@
 	}
 	</tbody>
 </table>
+
+<script>
+	setInterval(() => {
+		fetch("")
+			.then(res => res.text())
+			.then(html => {
+				const parser = new DOMParser();
+				const doc = parser.parseFromString(html, "text/html");
+				const newTbody = doc.querySelector("tbody");
+				const currentTbody = document.querySelector("tbody");
+				currentTbody.replaceWith(newTbody);
+			})
+			.catch(console.error);
+	}, 5000);
+</script>
+
