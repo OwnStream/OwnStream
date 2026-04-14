@@ -192,7 +192,28 @@ public class TranscodeJob : IJob
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
 			CreatedAt = DateTimeOffset.UtcNow,
 		};
-		db.FfmpegJobs.Add(trickplayJob);
+
+		DatabaseFfmpegJob metadataJob = new()
+		{
+			Id = Guid.NewGuid(),
+			JobType = "FetchMetadata",
+			InputPath = job.InputPath,
+			OutputPath = job.OutputPath,
+			Arguments = JsonSerializer.Serialize(new FetchMetadataJob.Arguments
+			{
+				VideoId = args.VideoId,
+				LibraryId = args.LibraryId,
+				Type = args.Metadata["type"],
+				Season = int.Parse(args.Metadata["season"]),
+				Episode = int.Parse(args.Metadata["episode"]),
+				ProviderIds = args.Metadata.Where(x => x.Key.EndsWith("id"))
+					.ToDictionary(x => x.Key[..^2], x => x.Value)
+			}),
+			Status = DatabaseFfmpegJob.JobStatus.Pending,
+			// We want it done as soon as possible, so abuse this field to make it run right after this job
+			CreatedAt = job.CreatedAt.AddSeconds(1),
+		};
+		db.FfmpegJobs.AddRange(trickplayJob, metadataJob);
 		await db.SaveChangesAsync(cancellationToken);
 
 		DatabaseVideo dbVideo = new()

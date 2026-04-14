@@ -81,6 +81,7 @@ public class FfmpegJobBackgroundService(IServiceScopeFactory scopeFactory, ILogg
 			{
 				"TranscodeFull" => new TranscodeJob(),
 				"GenerateTrickplay" => new GenerateTrickplayJob(),
+				"FetchMetadata" => new FetchMetadataJob(),
 				_ => throw new Exception($"Unexpected job type '{job.JobType}'")
 			};
 

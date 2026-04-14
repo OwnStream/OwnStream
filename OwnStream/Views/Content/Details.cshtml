@@ -1,0 +1,72 @@
+@using OwnStream.Database.Models
+@model OwnStream.Database.Models.DatabaseContent
+
+@{
+	string title = (Model.TranslatedTitle.TryGetValue("en_US", out string? t) && t.Length > 0) ? t : Model.Title;
+	string tagline = (Model.TranslatedTagline.TryGetValue("en_US", out string? ta) && ta.Length > 0) ? ta : Model.Tagline;
+	string description = (Model.TranslatedDescription.TryGetValue("en_US", out string? d) && d.Length > 0) ? d : Model.Description;
+	ViewBag.Title = title;
+	Layout = "_Layout";
+}
+
+<table>
+	<tbody>
+	<tr>
+		<td>
+			<img src="@Model.Poster" alt="@title" style="width: 200px; height: 300px; margin-right: 8px	">
+		</td>
+		<td style="vertical-align: top">
+			<h2>@title - @Model.ReleasedAt.Year</h2>
+			<div>@tagline</div>
+			<hr/>
+			<p>@description</p>
+		</td>
+	</tr>
+	</tbody>
+</table>
+<hr/>
+@if (Model.Type == DatabaseContent.ContentType.Movie)
+{
+	Guid? videoId = Model.Episodes.FirstOrDefault()?.Videos?.FirstOrDefault()?.Id;
+
+	if (videoId != null)
+	{
+		<a class="btn btn-primary" asp-controller="Video" asp-action="Watch" asp-route-id="@videoId">Watch</a>
+	}
+	else
+	{
+		<div class="btn btn-secondary">Video not found</div>
+	}
+}
+<hr/>
+<h3>Episodes</h3>
+<table class="table table-hover">
+	<thead>
+	<tr>
+		<td>#</td>
+		<td>Thumbnail</td>
+		<td>Title</td>
+		<td>Description</td>
+		<td>Actions</td>
+	</tr>
+	</thead>
+	<tbody>
+	@foreach (DatabaseEpisode episode in Model.Episodes)
+	{
+		<tr>
+			<td>@(episode.Season)x@(episode.Episode)</td>
+			<td style="width: 170px"><img height="96" width="170" style="background: #333; display: block"
+			                              src="@episode.Thumbnail" alt="Thumbnail"></td>
+			<td>@episode.Title</td>
+			<td>@episode.Summary</td>
+			<td>
+				@if (episode.Videos.Count > 0)
+				{
+					<a class="btn btn-primary" asp-controller="Video" asp-action="Watch"
+					   asp-route-id="@episode.Videos.First().Id">Watch</a>
+				}
+			</td>
+		</tr>
+	}
+	</tbody>
+</table>

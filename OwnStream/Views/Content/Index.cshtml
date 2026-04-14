@@ -1,0 +1,60 @@
+@using OwnStream.Database.Models
+@model OwnStream.Database.Models.DatabaseContent[]
+
+@{
+	ViewBag.Title = "Content";
+	Layout = "_Layout";
+}
+
+<h2>Content</h2>
+
+<style>
+	.poster-grid {
+		display: flex;
+		gap: 16px;
+	}
+
+	.poster-grid > a {
+		display: block;
+		text-decoration: none;
+		width: 150px;
+		transition: all;
+	}
+
+	.poster-grid > a:hover {
+		scale: 110%;
+	}
+
+	.poster-grid > a img {
+		width: 150px;
+		height: 225px;
+	}
+
+	.poster-grid .title {
+		text-align: center;
+	}
+
+	.poster-grid .info {
+		text-align: center;
+		font-size: smaller;
+	}
+</style>
+<div class="poster-grid">
+	@foreach (DatabaseContent content in Model)
+	{
+		<a asp-action="Details" asp-route-id="@content.Id">
+			<img src="@content.Poster" alt="@content.Title">
+			<div class="title">
+				@if (content.TranslatedTitle.TryGetValue("en_US", out string? title) && title.Length > 0)
+				{
+					@title
+				}
+				else
+				{
+					@content.Title
+				}
+			</div>
+			<div class="info">@content.ReleasedAt.Year</div>
+		</a>
+	}
+</div>

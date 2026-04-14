@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OwnStream.Database;
@@ -12,9 +13,11 @@ using OwnStream.Database;
 namespace OwnStream.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260414114058_AddContent")]
+    partial class AddContent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,11 +49,12 @@ namespace OwnStream.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Dictionary<string, string>>("ExternalIds")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.Property<DateTimeOffset?>("FinishedStreamingAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ImdbId")
-                        .HasColumnType("text");
 
                     b.Property<Guid>("LibraryId")
                         .HasColumnType("uuid");
@@ -75,9 +79,6 @@ namespace OwnStream.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("TmdbId")
-                        .HasColumnType("integer");
-
                     b.Property<Dictionary<string, string>>("TranslatedDescription")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -97,6 +98,10 @@ namespace OwnStream.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExternalIds");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ExternalIds"), "gin");
 
                     b.HasIndex("LibraryId");
 
@@ -249,7 +254,7 @@ namespace OwnStream.Migrations
                         .IsRequired()
                         .HasColumnType("bytea");
 
-                    b.Property<Guid?>("EpisodeId")
+                    b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Fps")
@@ -330,7 +335,9 @@ namespace OwnStream.Migrations
                 {
                     b.HasOne("OwnStream.Database.Models.DatabaseEpisode", "Episode")
                         .WithMany()
-                        .HasForeignKey("EpisodeId");
+                        .HasForeignKey("EpisodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("OwnStream.Database.Models.DatabaseLibrary", "Library")
                         .WithMany()
