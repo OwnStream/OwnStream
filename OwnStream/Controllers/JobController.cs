@@ -9,8 +9,7 @@ namespace OwnStream.Controllers;
 public class JobController(DatabaseContext db) : Controller
 {
 	public IActionResult Index() => View(db.FfmpegJobs
-		.OrderByDescending(x => x.Status)
-		.ThenByDescending(x => x.CompletedAt)
+		.OrderByDescending(x => x.CompletedAt)
 		.ThenByDescending(x => x.CreatedAt).ToArray());
 
 	public IActionResult Requeue(Guid id)

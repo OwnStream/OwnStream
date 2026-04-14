@@ -72,7 +72,7 @@
 			<td>
 				@if (job.Status is DatabaseFfmpegJob.JobStatus.Completed or DatabaseFfmpegJob.JobStatus.Failed)
 				{
-					<a asp-action="Requeue" asp-route-id="@job.Id" class="btn btn-danger">Restart</a>
+					<a asp-action="Requeue" asp-route-id="@job.Id" class="btn btn-danger">Requeue</a>
 				}
 			</td>
 		</tr>

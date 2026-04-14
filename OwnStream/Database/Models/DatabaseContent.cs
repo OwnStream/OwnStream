@@ -27,6 +27,8 @@ public class DatabaseContent
 	public Dictionary<string, string> AgeRatings { get; set; } = [];
 	public string? ImdbId { get; set; }
 	public int? TmdbId { get; set; }
+	public int? TvdbId { get; set; }
+	public int? TvMazeId { get; set; }
 	public ICollection<DatabaseEpisode> Episodes { get; } = new List<DatabaseEpisode>();
 
 	public enum ContentType

@@ -197,8 +197,8 @@ public class TranscodeJob : IJob
 		{
 			Id = Guid.NewGuid(),
 			JobType = "FetchMetadata",
-			InputPath = job.InputPath,
-			OutputPath = job.OutputPath,
+			InputPath = "",
+			OutputPath = "",
 			Arguments = JsonSerializer.Serialize(new FetchMetadataJob.Arguments
 			{
 				VideoId = args.VideoId,

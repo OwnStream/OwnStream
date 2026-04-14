@@ -8,7 +8,7 @@ namespace OwnStream.Controllers;
 [Authorize]
 public class VideoController(DatabaseContext db) : Controller
 {
-	public IActionResult Index() => View(db.Videos.ToArray());
+	public IActionResult Index() => View(db.Videos.Where(x => x.EpisodeId == null).ToArray());
 
 	public IActionResult Watch(Guid id)
 	{
