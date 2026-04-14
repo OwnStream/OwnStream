@@ -165,7 +165,7 @@ public class TranscodeJob : IJob
 					.AddStream(subtitle)
 					.SetOutput(Path.Join(job.OutputPath, "captions", $"{name}.{extension}"));
 				await subConv.Start(cancellationToken);
-				if (subtitle.Codec != "ass") continue;
+				if (subtitle.Codec != "vtt") continue;
 				subConv = new Conversion()
 					.AddStream(subtitle.SetCodec(SubtitleCodec.webvtt))
 					.SetOutput(Path.Join(job.OutputPath, "captions", name + ".vtt"));
