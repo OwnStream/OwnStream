@@ -16,7 +16,14 @@
 			<img src="@Model.Poster" alt="@title" style="width: 200px; height: 300px; margin-right: 8px	">
 		</td>
 		<td style="vertical-align: top">
-			<h2>@title - @Model.ReleasedAt.Year</h2>
+			@if (Model.Type == DatabaseContent.ContentType.Movie)
+			{
+				<h2>@title - @Model.ReleasedAt.Year</h2>
+			}
+			else
+			{
+				<h2>@title - @Model.ReleasedAt.Year — @Model.FinishedStreamingAt?.Year</h2>
+			}
 			<div>@tagline</div>
 			<hr/>
 			<p>@description</p>
@@ -51,7 +58,7 @@
 	</tr>
 	</thead>
 	<tbody>
-	@foreach (DatabaseEpisode episode in Model.Episodes)
+	@foreach (DatabaseEpisode episode in Model.Episodes.OrderByDescending(x => x.Season).ThenBy(x => x.Episode))
 	{
 		<tr>
 			<td>@(episode.Season)x@(episode.Episode)</td>
