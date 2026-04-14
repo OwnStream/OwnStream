@@ -127,7 +127,7 @@ public class TranscodeJob : IJob
 		conv.OnProgress += async (_, eventArgs) =>
 		{
 			DateTimeOffset now = DateTimeOffset.UtcNow;
-			if (!((now - lastProgressUpdate).TotalSeconds >= 1)) return;
+			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
 			lastProgressUpdate = now;
 			job.Message = "%" + eventArgs.Percent;
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
