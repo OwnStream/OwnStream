@@ -7,10 +7,10 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/content/{id:guid}"), Authorize(AuthenticationSchemes = "ApiToken")]
+[ApiController, Route("/api/content/"), Authorize(AuthenticationSchemes = "ApiToken")]
 public class ContentController(DatabaseContext db) : Controller
 {
-	[HttpGet("details")]
+	[HttpGet("{id:guid}/details")]
 	public Content? GetDetails(Guid id, string? locale = null)
 	{
 		DatabaseContent? content = db.Content
@@ -27,7 +27,7 @@ public class ContentController(DatabaseContext db) : Controller
 		return new Content(content, locale);
 	}
 
-	[HttpGet("seasons")]
+	[HttpGet("{id:guid}/seasons")]
 	public Season[]? GetSeasons(Guid id)
 	{
 		DatabaseContent? content = db.Content
@@ -51,7 +51,7 @@ public class ContentController(DatabaseContext db) : Controller
 			.ToArray();
 	}
 
-	[HttpGet("seasons/{season:int}/episodes")]
+	[HttpGet("{id:guid}/seasons/{season:int}/episodes")]
 	public Episode[]? GetEpisodes(Guid id, int season, string? locale = null)
 	{
 		DatabaseContent? content = db.Content
@@ -70,5 +70,21 @@ public class ContentController(DatabaseContext db) : Controller
 			.Select(x => new Episode(x, locale))
 			.OrderBy(x => x.EpisodeNumber)
 			.ToArray();
+	}
+
+	[HttpGet("episode/{id:guid}")]
+	public Episode? GetEpisode(Guid id, string? locale = null)
+	{
+		DatabaseEpisode? content = db.Episode
+			.Include(x => x.Videos)
+			.FirstOrDefault(x => x.Id == id);
+
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		return new Episode(content, locale);
 	}
 }
