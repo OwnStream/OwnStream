@@ -8,9 +8,26 @@ namespace OwnStream.Controllers;
 [Authorize]
 public class JobController(DatabaseContext db) : Controller
 {
-	public IActionResult Index() => View(db.FfmpegJobs
-		.OrderByDescending(x => x.CompletedAt)
-		.ThenByDescending(x => x.CreatedAt).ToArray());
+	public IActionResult Index()
+	{
+		DatabaseFfmpegJob[] jobs = db.FfmpegJobs
+			.OrderByDescending(x => x.CompletedAt)
+			.ThenByDescending(x => x.CreatedAt)
+			.ToArray()
+			.OrderByDescending(x =>
+			{
+				return x.Status switch
+				{
+					DatabaseFfmpegJob.JobStatus.Pending => 1,
+					DatabaseFfmpegJob.JobStatus.Starting => 2,
+					DatabaseFfmpegJob.JobStatus.Processing => 2,
+					DatabaseFfmpegJob.JobStatus.Completed => 0,
+					DatabaseFfmpegJob.JobStatus.Failed => 1,
+					_ => throw new ArgumentOutOfRangeException()
+				};
+			}).ToArray();
+		return View(jobs);
+	}
 
 	public IActionResult Requeue(Guid id)
 	{
