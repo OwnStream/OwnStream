@@ -22,11 +22,12 @@ public class VideoController(DatabaseContext db) : Controller
 			return null;
 		}
 
+		DatabaseEpisode? ep = db.Episode.IgnoreAutoIncludes().FirstOrDefault(x => x.Id == video.EpisodeId);
 		return new Video(video)
 		{
 			Subtitles = GetSubtitles(video),
 			PreviewFiles = GetPreviewFiles(video),
-			Episode = new Episode(db.Episode.IgnoreAutoIncludes().FirstOrDefault(x => x.Id == video.EpisodeId))
+			Episode = ep != null ? new Episode(ep) : null
 		};
 	}
 
@@ -63,10 +64,6 @@ public class VideoController(DatabaseContext db) : Controller
 		string[] files = Directory.GetFiles(subtitlesDir).Select(x => Path.GetFileName(x)).ToArray();
 		string[] mediumFiles = files.Where(x => x.StartsWith("medium_")).ToArray();
 		List<PreviewFile> r = [];
-		foreach (string file in files)
-		{
-			Console.WriteLine(file);
-		}
 		if (files.Contains("small.png"))
 		{
 			r.Add(new PreviewFile
