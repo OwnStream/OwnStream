@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using OwnStream;
 using OwnStream.Database;
@@ -14,7 +16,35 @@ builder.Services.AddAuthentication(options =>
 		options.DefaultAuthenticateScheme = "Cookies";
 		options.DefaultChallengeScheme = "Cookies";
 	})
-	.AddCookie("Cookies", options => { options.LoginPath = "/Auth/Login"; });
+	.AddScheme<JwtAuth.SchemeOptions, JwtAuth>("ApiToken", options =>
+	{
+		string? jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+		if (jwtKey is null)
+			Console.WriteLine(
+				"Environment variable JWT_KEY is not set! Using a random JWT key, which means that logins will not be persisted across service restarts.");
+
+		options.JwtKey = Convert.FromHexString(jwtKey ?? new Random().GetHexString(32));
+	})
+	.AddCookie("Cookies", options =>
+	{
+		options.LoginPath = "/Auth/Login";
+		options.Events = new CookieAuthenticationEvents
+		{
+			OnValidatePrincipal = async context =>
+			{
+				DatabaseContext db = context.HttpContext.RequestServices.GetRequiredService<DatabaseContext>();
+				Guid? id = Guid.TryParse(context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "",
+					out Guid userId)
+					? userId
+					: null;
+				if (id == null || !db.Users.Any(x => x.Id == id))
+				{
+					context.RejectPrincipal();
+					await context.HttpContext.SignOutAsync("Cookies");
+				}
+			}
+		};
+	});
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 
@@ -57,15 +58,5 @@ public class MediaController(DatabaseContext db) : Controller
 				};
 			}).ToArray();
 		return Json(subtitles);
-	}
-
-	public class SubtitleFile
-	{
-		public int Id { get; set; }
-		public Dictionary<string, string> Files { get; set; }
-		public bool Default { get; set; }
-		public bool Forced { get; set; }
-		public string Language { get; set; }
-		public string Title { get; set; }
 	}
 }

@@ -1,0 +1,74 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OwnStream.ApiModels.Response;
+using OwnStream.Database;
+using OwnStream.Database.Models;
+
+namespace OwnStream.Controllers.Api;
+
+[ApiController, Route("/api/content/{id:guid}"), Authorize(AuthenticationSchemes = "ApiToken")]
+public class ContentController(DatabaseContext db) : Controller
+{
+	[HttpGet("details")]
+	public Content? GetDetails(Guid id, string? locale = null)
+	{
+		DatabaseContent? content = db.Content
+			.Include(x => x.Episodes)
+			.ThenInclude(x => x.Videos)
+			.FirstOrDefault(x => x.Id == id);
+
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		return new Content(content, locale);
+	}
+
+	[HttpGet("seasons")]
+	public Season[]? GetSeasons(Guid id)
+	{
+		DatabaseContent? content = db.Content
+			.Include(x => x.Episodes)
+			.FirstOrDefault(x => x.Id == id);
+
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return [];
+		}
+
+		return content.Episodes
+			.GroupBy(x => x.Season)
+			.Select(x => new Season
+			{
+				Index = x.Key,
+				EpisodeCount = x.Count(),
+			})
+			.OrderBy(x => x.Index)
+			.ToArray();
+	}
+
+	[HttpGet("seasons/{season:int}/episodes")]
+	public Episode[]? GetEpisodes(Guid id, int season, string? locale = null)
+	{
+		DatabaseContent? content = db.Content
+			.Include(x => x.Episodes)
+			.ThenInclude(x => x.Videos)
+			.FirstOrDefault(x => x.Id == id);
+
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return [];
+		}
+
+		return content.Episodes
+			.Where(x => x.Season == season)
+			.Select(x => new Episode(x, locale))
+			.OrderBy(x => x.EpisodeNumber)
+			.ToArray();
+	}
+}

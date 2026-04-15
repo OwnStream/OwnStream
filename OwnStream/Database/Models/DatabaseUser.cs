@@ -17,9 +17,7 @@ public class DatabaseUser
 		List<Claim> claims =
 		[
 			new(ClaimTypes.NameIdentifier, Id.ToString()),
-			new(ClaimTypes.Name, Username),
-			new(ClaimTypes.AuthenticationMethod, "JWT_Cookie"),
-			new("OwnStream__userObject", JsonSerializer.Serialize(this)),
+			new(ClaimTypes.Name, Username)
 		];
 
 		ClaimsIdentity identity = new(claims, "Cookies");
