@@ -146,8 +146,7 @@ public class TranscodeJob : IJob
 			await db.SaveChangesAsync(cancellationToken);
 
 			StringBuilder name = new();
-			if (subtitle.Language.Length > 0) name.Append(subtitle.Language);
-			if (subtitle.Title.Length > 0) name.Append('.').Append(subtitle.Title);
+			name.Append(subtitle.Language).Append('.').Append(subtitle.Title ?? subtitle.Language);
 			if (subtitle.Forced > 0) name.Append(".forced");
 			if (subtitle.Default > 0) name.Append(".default");
 			name.Append($".{subtitle.Index}");
