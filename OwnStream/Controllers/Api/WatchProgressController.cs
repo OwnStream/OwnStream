@@ -78,6 +78,7 @@ public class WatchProgressController(DatabaseContext db) : Controller
 
 		DatabaseWatchProgress? progress = db.WatchProgress
 			.Where(x => x.UserId == user!.Id)
+			.Where(x => x.VideoId == video.Id)
 			.OrderByDescending(x => x.UpdatedAt)
 			.FirstOrDefault();
 
