@@ -87,4 +87,40 @@ public class ContentController(DatabaseContext db) : Controller
 
 		return new Episode(content, HttpContext);
 	}
+
+	[HttpGet("episode/{id:guid}/next")]
+	public Episode? GetNextEpisode(Guid id)
+	{
+		DatabaseEpisode? episode = db.Episode
+			                           .Include(x => x.Videos)
+			                           .FirstOrDefault(x => x.Id == id) ??
+		                           db.Videos
+			                           .Include(x => x.Episode)
+			                           .ThenInclude(x => x!.Videos)
+			                           .FirstOrDefault(x => x.Id == id)?
+			                           .Episode;
+
+		if (episode == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		DatabaseEpisode? nextEpisode = db.Episode
+			.Include(x => x.Videos)
+			.Where(x => x.ParentContentId == episode.ParentContentId)
+			.Where(x => x.Season > episode.Season ||
+			            (x.Season == episode.Season && x.Episode > episode.Episode))
+			.OrderBy(x => x.Season)
+			.ThenBy(x => x.Episode)
+			.FirstOrDefault();
+
+		if (nextEpisode == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		return new Episode(nextEpisode, HttpContext);
+	}
 }
