@@ -30,6 +30,8 @@ public class DatabaseContent
 	public int? TvdbId { get; set; }
 	public int? TvMazeId { get; set; }
 	public ICollection<DatabaseEpisode> Episodes { get; } = new List<DatabaseEpisode>();
+	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
+	
 
 	public enum ContentType
 	{

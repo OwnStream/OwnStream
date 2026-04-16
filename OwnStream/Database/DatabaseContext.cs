@@ -15,6 +15,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseFfmpegJob> FfmpegJobs { get; set; }
 	public DbSet<DatabaseContent> Content { get; set; }
 	public DbSet<DatabaseEpisode> Episode { get; set; }
+	public DbSet<DatabaseWatchProgress> WatchProgress { get; set; }
 
 	private static void PrepareDataSource()
 	{

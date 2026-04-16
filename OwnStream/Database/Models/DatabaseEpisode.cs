@@ -19,4 +19,5 @@ public class DatabaseEpisode
 	public DateTimeOffset UpdatedAt { get; set; }
 	public DateTimeOffset ReleasedAt { get; set; }
 	public ICollection<DatabaseVideo> Videos { get; } = new List<DatabaseVideo>();
+	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
 }
