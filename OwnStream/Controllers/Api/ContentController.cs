@@ -57,6 +57,8 @@ public class ContentController(DatabaseContext db) : Controller
 		DatabaseContent? content = db.Content
 			.Include(x => x.Episodes)
 			.ThenInclude(x => x.Videos)
+			.Include(x => x.Episodes)
+			.ThenInclude(x => x.WatchProgresses)
 			.FirstOrDefault(x => x.Id == id);
 
 		if (content == null)
@@ -77,6 +79,7 @@ public class ContentController(DatabaseContext db) : Controller
 	{
 		DatabaseEpisode? content = db.Episode
 			.Include(x => x.Videos)
+			.Include(x => x.WatchProgresses)
 			.FirstOrDefault(x => x.Id == id);
 
 		if (content == null)
@@ -93,10 +96,13 @@ public class ContentController(DatabaseContext db) : Controller
 	{
 		DatabaseEpisode? episode = db.Episode
 			                           .Include(x => x.Videos)
+			                           .Include(x => x.WatchProgresses)
 			                           .FirstOrDefault(x => x.Id == id) ??
 		                           db.Videos
 			                           .Include(x => x.Episode)
 			                           .ThenInclude(x => x!.Videos)
+			                           .Include(x => x.Episode)
+			                           .ThenInclude(x => x!.WatchProgresses)
 			                           .FirstOrDefault(x => x.Id == id)?
 			                           .Episode;
 

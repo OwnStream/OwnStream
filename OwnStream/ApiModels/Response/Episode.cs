@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Humanizer;
 using OwnStream.Database.Models;
 
@@ -23,4 +24,13 @@ public class Episode(DatabaseEpisode episode, HttpContext? context = null)
 	public DateTimeOffset UpdatedAt { get; set; } = episode.UpdatedAt;
 	public DateTimeOffset ReleasedAt { get; set; } = episode.ReleasedAt;
 	public IEnumerable<Video> Videos { get; set; } = episode.Videos.Select(x => new Video(x));
+
+	public float? Progress { get; set; } = context != null
+		? episode.WatchProgresses
+			.Where(x => x.UserId ==
+			            Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Guid.Empty.ToString()))
+			.Where(x => x.EpisodeId == episode.Id)
+			.MaxBy(x => x.UpdatedAt)?
+			.WatchPercentage
+		: null;
 }
