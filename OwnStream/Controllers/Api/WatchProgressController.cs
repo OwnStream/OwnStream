@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Requests;
+using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 
@@ -43,6 +44,110 @@ public class WatchProgressController(DatabaseContext db) : Controller
 		db.SaveChanges();
 
 		return NoContent();
+	}
+
+	[HttpGet("{id:guid}")]
+	public EpisodeToWatchResponse? EpisodeToWatch(Guid id)
+	{
+		bool hasUser = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", out Guid userId);
+		DatabaseUser? user = db.Users.Find(userId);
+
+		if (!hasUser || user == null)
+		{
+			Response.StatusCode = 401;
+			return null;
+		}
+
+		DatabaseContent? content = db.Content.Find(id);
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		if (content.Type == DatabaseContent.ContentType.Movie)
+		{
+			DatabaseEpisode? episode = db.Episode
+				.Include(x => x.Videos)
+				.FirstOrDefault(x => x.ParentContentId == id);
+			DatabaseWatchProgress movieWatchProgress = db.WatchProgress
+				.Include(x => x.Episode)
+				.ThenInclude(x => x!.Videos)
+				.Where(x => x.UserId == user.Id && x.ContentId == id)
+				.OrderBy(x => x.UpdatedAt)
+				.FirstOrDefault() ?? new DatabaseWatchProgress
+			{
+				Id = Guid.Empty,
+				UserId = Guid.Empty,
+				ContentId = content?.Id,
+				Content = null,
+				EpisodeId = episode?.Id,
+				Episode = episode,
+				VideoId = Guid.Empty,
+				MillisecondsWatched = 0,
+				VideoLength = 0,
+				FullyWatched = true,
+				UpdatedAt = default
+			};
+
+			return new EpisodeToWatchResponse
+			{
+				ContinueWatching = movieWatchProgress.FullyWatched
+					? null
+					: new Episode(movieWatchProgress.Episode!, HttpContext),
+				Progress = movieWatchProgress.FullyWatched ? null : movieWatchProgress.WatchPercentage,
+				UpNext = movieWatchProgress.FullyWatched ? new Episode(episode!, HttpContext) : null
+			};
+		}
+
+		DatabaseWatchProgress? mostRecentWatchProgress = db.WatchProgress
+			.Include(x => x.Episode)
+			.Where(x => x.UserId == user.Id && x.ContentId == id)
+			.OrderBy(x => x.UpdatedAt)
+			.FirstOrDefault();
+
+		DatabaseWatchProgress? farthestWatchProgress = db.WatchProgress
+			.Include(x => x.Episode)
+			.ThenInclude(x => x!.Videos)
+			.Where(x => x.UserId == user.Id && x.ContentId == id)
+			.OrderByDescending(x => x.Episode!.Season)
+			.ThenByDescending(x => x.Episode!.Episode)
+			.FirstOrDefault();
+
+		if (mostRecentWatchProgress == null)
+		{
+			DatabaseEpisode? firstEpisode = db.Episode
+				.Include(x => x.Videos)
+				.Where(x => x.ParentContentId == id)
+				.OrderBy(x => x.Season)
+				.ThenBy(x => x.Episode)
+				.FirstOrDefault();
+
+			return new EpisodeToWatchResponse
+			{
+				ContinueWatching = null,
+				Progress = null,
+				UpNext = firstEpisode != null ? new Episode(firstEpisode, HttpContext) : null
+			};
+		}
+
+		DatabaseEpisode watchingEpisode = mostRecentWatchProgress.Episode!;
+		DatabaseEpisode farthestEpisode = farthestWatchProgress?.Episode ?? watchingEpisode;
+		DatabaseEpisode? nextEpisode = db.Episode
+			.Include(x => x.Videos)
+			.Where(x => x.ParentContentId == id)
+			.Where(x => x.Season > farthestEpisode.Season ||
+			            (x.Season == farthestEpisode.Season && x.Episode > farthestEpisode.Episode))
+			.OrderBy(x => x.Season)
+			.ThenBy(x => x.Episode)
+			.FirstOrDefault();
+
+		return new EpisodeToWatchResponse
+		{
+			ContinueWatching = mostRecentWatchProgress.FullyWatched ? null : new Episode(watchingEpisode, HttpContext),
+			Progress = mostRecentWatchProgress.FullyWatched ? null : mostRecentWatchProgress.WatchPercentage,
+			UpNext = nextEpisode == null ? null : new Episode(nextEpisode, HttpContext)
+		};
 	}
 
 	private DatabaseWatchProgress? GetWatchProgress(UpdateWatchProgressRequest request, DatabaseUser user)
