@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +15,13 @@ public class HomeController(DatabaseContext db) : Controller
 	[HttpGet("shelves")]
 	public IEnumerable<Shelf> GetShelves()
 	{
+		Guid userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Guid.Empty.ToString());
 		DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(30);
 		DatabaseWatchProgress[] watchProgresses = db.WatchProgress
 			.Include(x => x.Episode)
 			.Include(x => x.Content)
 			.ThenInclude(x => x!.Episodes)
+			.Where(x => x.UserId == userId)
 			.ToArray();
 		List<Shelf> shelves =
 		[
