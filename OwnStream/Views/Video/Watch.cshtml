@@ -130,21 +130,27 @@ else
 
 <script>
 	const video = document.querySelector("video");
-	setInterval(() => {
-		const played = Math.round(video.currentTime * 1000);
-		const total = Math.round(video.duration * 1000);
-		const finished = (played / total) > .95;
-		fetch("/api/progress/update", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify({
-				videoId: "@Model.Id",
-				videoLength: total,
-				watchedMilliseconds: played,
-				markAsWatched: finished
-			})
-		});
-	}, 5000);
+	// Yes, this is jank. It will be fixed when I write the actual web UI.
+	setTimeout(async () => {
+		const progress = await fetch("/api/progress/@Model.Id").then(x => x.json());
+		if (progress.videoId === "@Model.Id" && progress.duration > 0 && progress.position > 0)
+			video.currentTime = progress.position / 1000;
+		setInterval(() => {
+			const played = Math.round(video.currentTime * 1000);
+			const total = Math.round(video.duration * 1000);
+			const finished = (played / total) > .95;
+			fetch("/api/progress/update", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify({
+					videoId: "@Model.Id",
+					videoLength: total,
+					watchedMilliseconds: played,
+					markAsWatched: finished
+				})
+			});
+		}, 5000);
+	}, 3000);
 </script>

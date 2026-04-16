@@ -34,20 +34,64 @@ public class WatchProgressController(DatabaseContext db) : Controller
 		DatabaseWatchProgress? progress = GetWatchProgress(request, user);
 
 		if (progress == null) return NotFound();
+
+		// Ignore requests if times are == 0 in case a client sends
+		// a request while their player hasn't loaded the video yet
+		if (request.WatchedMilliseconds <= 0 || request.VideoLength <= 0)
+		{
+			progress.UpdatedAt = DateTimeOffset.UtcNow;
+			if (request.MarkAsWatched.HasValue) progress.FullyWatched = request.MarkAsWatched.Value;
+			return NoContent();
+		}
+
 		progress.UpdatedAt = DateTimeOffset.UtcNow;
-		if (request.WatchedMilliseconds.HasValue)
-			progress.MillisecondsWatched = request.WatchedMilliseconds.Value;
-		if (request.VideoLength.HasValue)
-			progress.VideoLength = request.VideoLength.Value;
-		if (request.MarkAsWatched.HasValue)
-			progress.FullyWatched = request.MarkAsWatched.Value;
+		if (request.WatchedMilliseconds.HasValue) progress.MillisecondsWatched = request.WatchedMilliseconds.Value;
+		if (request.VideoLength.HasValue) progress.VideoLength = request.VideoLength.Value;
+		if (request.MarkAsWatched.HasValue) progress.FullyWatched = request.MarkAsWatched.Value;
 		db.SaveChanges();
 
 		return NoContent();
 	}
 
 	[HttpGet("{id:guid}")]
-	public EpisodeToWatchResponse? EpisodeToWatch(Guid id)
+	public WatchProgressResponse? GetProgress(Guid id)
+	{
+		bool hasUser = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", out Guid userId);
+		DatabaseUser? user = db.Users.Find(userId);
+
+		if (!hasUser || user == null)
+		{
+			Response.StatusCode = 401;
+			return null;
+		}
+
+		DatabaseVideo? video = db.Videos.Find(id) ??
+		                       db.Episode.Include(x => x.Videos)
+			                       .FirstOrDefault(x => x.Id == id)?
+			                       .Videos.FirstOrDefault();
+
+		if (video == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		DatabaseWatchProgress? progress = db.WatchProgress
+			.Where(x => x.UserId == user!.Id)
+			.OrderByDescending(x => x.UpdatedAt)
+			.FirstOrDefault();
+
+		return new WatchProgressResponse
+		{
+			VideoId = video.Id,
+			Position = progress?.MillisecondsWatched ?? 0,
+			Duration = progress?.VideoLength ?? 0,
+			WasMarkedAsWatched = progress?.FullyWatched ?? false
+		};
+	}
+
+	[HttpGet("upNext/{id:guid}")]
+	public EpisodeToWatchResponse? UpNext(Guid id)
 	{
 		bool hasUser = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "", out Guid userId);
 		DatabaseUser? user = db.Users.Find(userId);

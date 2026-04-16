@@ -35,7 +35,7 @@
 <a class="btn btn-secondary" id="watchButton">Loading episode to watch...</a>
 <script>
 	const button = document.getElementById("watchButton")
-	fetch("/api/progress/@Model.Id")
+	fetch("/api/progress/upNext/@Model.Id")
 		.then(x => x.json())
 		.then(data => {
 			const episode = data.continueWatching || data.upNext;
@@ -66,7 +66,7 @@
 	<tbody>
 	@foreach (DatabaseEpisode episode in Model.Episodes.OrderByDescending(x => x.Season).ThenBy(x => x.Episode))
 	{
-		<tr>
+		<tr data-episode-id="@episode.Id">
 			<td>@(episode.Season)x@(episode.Episode)</td>
 			<td style="width: 170px"><img height="96" width="170" style="background: #333; display: block"
 			                              src="@episode.Thumbnail" alt="Thumbnail"></td>
