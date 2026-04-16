@@ -118,7 +118,7 @@ public class WatchProgressController(DatabaseContext db) : Controller
 				.Include(x => x.Episode)
 				.ThenInclude(x => x!.Videos)
 				.Where(x => x.UserId == user.Id && x.ContentId == id)
-				.OrderBy(x => x.UpdatedAt)
+				.OrderByDescending(x => x.UpdatedAt)
 				.FirstOrDefault() ?? new DatabaseWatchProgress
 			{
 				Id = Guid.Empty,
@@ -147,7 +147,7 @@ public class WatchProgressController(DatabaseContext db) : Controller
 		DatabaseWatchProgress? mostRecentWatchProgress = db.WatchProgress
 			.Include(x => x.Episode)
 			.Where(x => x.UserId == user.Id && x.ContentId == id)
-			.OrderBy(x => x.UpdatedAt)
+			.OrderByDescending(x => x.UpdatedAt)
 			.FirstOrDefault();
 
 		DatabaseWatchProgress? farthestWatchProgress = db.WatchProgress
