@@ -4,12 +4,17 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using OwnStream;
 using OwnStream.Database;
+using OwnStream.JsonConverter;
 using OwnStream.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+	.AddJsonOptions(options =>
+	{
+		options.JsonSerializerOptions.Converters.Add(new DateTimeOffsetConverter());
+	});
 builder.Services.AddDbContext<DatabaseContext>();
 builder.Services.AddAuthentication(options =>
 	{
