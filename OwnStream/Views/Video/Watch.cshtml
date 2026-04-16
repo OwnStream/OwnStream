@@ -11,19 +11,18 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <style>
 	.ltp-controls-button > svg,
-	.ltp-controls-volume-icon > svg
-	{
+	.ltp-controls-volume-icon > svg {
 		stroke: currentColor;
 		stroke-width: 2;
 		stroke-linecap: round;
 		stroke-linejoin: round;
 		fill: none;
 	}
-	
+
 	.ltp-root {
 		min-height: 500px;
 	}
-	
+
 	.libassjs-canvas-parent, video {
 		position: absolute !important;
 		left: 0 !important;
@@ -47,48 +46,46 @@
 </video>
 
 @if (Context.Request.Query.ContainsKey("useAss"))
-{ 
+{
 	<script src="~/lib/subtitlesoctopus/subtitles-octopus.js"></script>
 	<script>
-	function setSubs(subs)
-	{
-		if (subs.length === 0) return;
-		return () => {
-			window.SubtitlesOctopusOnLoad = function () {
-				const sub = subs[0];
-				const options = {
-					video: window.player.player,
-					subUrl: `/Media/@Model.Id/captions/${sub.files.ass}`,
-					//fonts: ['/JavascriptSubtitlesOctopus/fonts/Arial.ttf', '/JavascriptSubtitlesOctopus/fonts/TimesNewRoman.ttf'],
-					//onReady: onReadyFunction,
-					//debug: true,
-					workerUrl: '/lib/subtitlesoctopus/subtitles-octopus-worker.js',
-					fallbackFont: '/lib/subtitlesoctopus/default.woff2'
+		function setSubs(subs) {
+			if (subs.length === 0) return;
+			return () => {
+				window.SubtitlesOctopusOnLoad = function () {
+					const sub = subs[0];
+					const options = {
+						video: window.player.player,
+						subUrl: `/Media/@Model.Id/captions/${sub.files.ass}`,
+						//fonts: ['/JavascriptSubtitlesOctopus/fonts/Arial.ttf', '/JavascriptSubtitlesOctopus/fonts/TimesNewRoman.ttf'],
+						//onReady: onReadyFunction,
+						//debug: true,
+						workerUrl: '/lib/subtitlesoctopus/subtitles-octopus-worker.js',
+						fallbackFont: '/lib/subtitlesoctopus/default.woff2'
+					};
+					window.octopusInstance = new SubtitlesOctopus(options); // You can experiment in console
 				};
-				window.octopusInstance = new SubtitlesOctopus(options); // You can experiment in console
+				if (SubtitlesOctopus) {
+					SubtitlesOctopusOnLoad();
+				}
 			};
-			if (SubtitlesOctopus) {
-				SubtitlesOctopusOnLoad();
-			}
-		};
-	}
+		}
 	</script>
 }
 else
 {
 	<script>
-	function setSubs(subs)
-	{
-		subs.forEach(sub => {
-			if (sub.files.vtt === undefined) return;
-			const track = document.createElement("track");
-			track.setAttribute("src", `/Media/@Model.Id/captions/${sub.files.vtt}`);
-			track.setAttribute("label", sub.title);
-			track.setAttribute("srclang", sub.language);
-			track.setAttribute("kind", "subtitles");
-			document.querySelector("video").appendChild(track);
-		});
-	}
+		function setSubs(subs) {
+			subs.forEach(sub => {
+				if (sub.files.vtt === undefined) return;
+				const track = document.createElement("track");
+				track.setAttribute("src", `/Media/@Model.Id/captions/${sub.files.vtt}`);
+				track.setAttribute("label", sub.title);
+				track.setAttribute("srclang", sub.language);
+				track.setAttribute("kind", "subtitles");
+				document.querySelector("video").appendChild(track);
+			});
+		}
 	</script>
 }
 <script>
@@ -127,5 +124,27 @@ else
 		window.player = player;
 		if (callback) callback();
 	}
+
 	loadVideo();
+</script>
+
+<script>
+	const video = document.querySelector("video");
+	setInterval(() => {
+		const played = Math.round(video.currentTime * 1000);
+		const total = Math.round(video.duration * 1000);
+		const finished = (played / total) > .95;
+		fetch("/api/progress/update", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify({
+				videoId: "@Model.Id",
+				videoLength: total,
+				watchedMilliseconds: played,
+				markAsWatched: finished
+			})
+		});
+	}, 5000);
 </script>

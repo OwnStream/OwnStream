@@ -2,9 +2,9 @@
 @model OwnStream.Database.Models.DatabaseContent
 
 @{
-	string title = Model.TranslatedTitle.GetLocalized(Model.Title, Context);
-	string tagline = Model.TranslatedTagline.GetLocalized(Model.Tagline, Context);
-	string description = Model.TranslatedDescription.GetLocalized(Model.Description, Context);
+	string title = Model.TranslatedTitle.GetLocalized(Model.Title, Context)!;
+	string tagline = Model.TranslatedTagline.GetLocalized(Model.Tagline, Context)!;
+	string description = Model.TranslatedDescription.GetLocalized(Model.Description, Context)!;
 	ViewBag.Title = title;
 	Layout = "_Layout";
 }
@@ -32,19 +32,25 @@
 	</tbody>
 </table>
 <hr/>
-@if (Model.Type == DatabaseContent.ContentType.Movie)
-{
-	Guid? videoId = Model.Episodes.FirstOrDefault()?.Videos?.FirstOrDefault()?.Id;
+<a class="btn btn-secondary" id="watchButton">Loading episode to watch...</a>
+<script>
+	const button = document.getElementById("watchButton")
+	fetch("/api/progress/@Model.Id")
+		.then(x => x.json())
+		.then(data => {
+			const episode = data.continueWatching || data.upNext;
+			const video = episode.videos[0];
+			if (episode && video) {
+				button.classList.replace("btn-secondary", "btn-primary");
+				button.removeAttribute("disabled");
 
-	if (videoId != null)
-	{
-		<a class="btn btn-primary" asp-controller="Video" asp-action="Watch" asp-route-id="@videoId">Watch</a>
-	}
-	else
-	{
-		<div class="btn btn-secondary">Video not found</div>
-	}
-}
+				button.href = `/Video/Watch/${video.id}`
+				button.innerText = `Watch S: ${episode.seasonNumber}  E: ${episode.episodeNumber} - ${episode.translatedTitle || episode.originalTitle}`
+			} else {
+				button.innerText = `No videos found.`
+			}
+		});
+</script>
 <hr/>
 <h3>Episodes</h3>
 <table class="table table-hover">
