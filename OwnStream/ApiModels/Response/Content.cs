@@ -3,25 +3,16 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.ApiModels.Response;
 
-public class Content(DatabaseContent content, string? locale)
+public class Content(DatabaseContent content, HttpContext context)
 {
 	public Guid Id { get; set; } = content.Id;
 	public string Type { get; set; } = content.Type.ToString();
 	public string OriginalTitle { get; set; } = content.Title;
-
-	public string? TranslatedTitle { get; set; } =
-		locale != null ? content.TranslatedTitle!.GetValueOrDefault(locale) : null;
-
+	public string? TranslatedTitle { get; set; } = content.TranslatedTitle!.GetLocalized(null, context);
 	public string OriginalTagline { get; set; } = content.Tagline;
-
-	public string? TranslatedTagline { get; set; } =
-		locale != null ? content.TranslatedTagline!.GetValueOrDefault(locale) : null;
-
+	public string? TranslatedTagline { get; set; } = content.TranslatedTagline!.GetLocalized(null, context);
 	public string OriginalDescription { get; set; } = content.Description;
-
-	public string? TranslatedDescription { get; set; } =
-		locale != null ? content.TranslatedDescription!.GetValueOrDefault(locale) : null;
-
+	public string? TranslatedDescription { get; set; } = content.TranslatedDescription!.GetLocalized(null, context);
 	public ContentImages Images { get; set; } = new(content);
 	public DateTimeOffset CreatedAt { get; set; } = content.CreatedAt;
 	public DateTimeOffset UpdatedAt { get; set; } = content.UpdatedAt;

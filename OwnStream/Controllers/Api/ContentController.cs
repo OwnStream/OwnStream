@@ -11,7 +11,7 @@ namespace OwnStream.Controllers.Api;
 public class ContentController(DatabaseContext db) : Controller
 {
 	[HttpGet("{id:guid}/details")]
-	public Content? GetDetails(Guid id, string? locale = null)
+	public Content? GetDetails(Guid id)
 	{
 		DatabaseContent? content = db.Content
 			.Include(x => x.Episodes)
@@ -24,7 +24,7 @@ public class ContentController(DatabaseContext db) : Controller
 			return null;
 		}
 
-		return new Content(content, locale);
+		return new Content(content, HttpContext);
 	}
 
 	[HttpGet("{id:guid}/seasons")]
@@ -52,7 +52,7 @@ public class ContentController(DatabaseContext db) : Controller
 	}
 
 	[HttpGet("{id:guid}/seasons/{season:int}/episodes")]
-	public Episode[]? GetEpisodes(Guid id, int season, string? locale = null)
+	public Episode[]? GetEpisodes(Guid id, int season)
 	{
 		DatabaseContent? content = db.Content
 			.Include(x => x.Episodes)
@@ -67,13 +67,13 @@ public class ContentController(DatabaseContext db) : Controller
 
 		return content.Episodes
 			.Where(x => x.Season == season)
-			.Select(x => new Episode(x, locale))
+			.Select(x => new Episode(x, HttpContext))
 			.OrderBy(x => x.EpisodeNumber)
 			.ToArray();
 	}
 
 	[HttpGet("episode/{id:guid}")]
-	public Episode? GetEpisode(Guid id, string? locale = null)
+	public Episode? GetEpisode(Guid id)
 	{
 		DatabaseEpisode? content = db.Episode
 			.Include(x => x.Videos)
@@ -85,6 +85,6 @@ public class ContentController(DatabaseContext db) : Controller
 			return null;
 		}
 
-		return new Episode(content, locale);
+		return new Episode(content, HttpContext);
 	}
 }

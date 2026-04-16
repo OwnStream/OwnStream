@@ -1,6 +1,6 @@
-using System.Runtime.CompilerServices;
 using System.Text;
 using Konscious.Security.Cryptography;
+using Microsoft.Extensions.Primitives;
 
 namespace OwnStream;
 
@@ -35,5 +35,45 @@ public static class Utils
 		else if (timeSpan.TotalSeconds < 60) sb.Append("< 1").Append(m);
 
 		return sb.ToString();
+	}
+
+	extension(Dictionary<string, string> translated)
+	{
+		public string? GetLocalized(string? original, HttpContext? context)
+		{
+			string[] headerLocales = context?.Request.Headers.AcceptLanguage
+				.SelectMany(x => x?.Split(',').Select(l => l.Split(';')[0]) ?? []).ToArray() ?? [];
+			StringValues queryLocales = [];
+			context?.Request.Query.TryGetValue("locale", out queryLocales);
+			string?[] locales = queryLocales.Count > 0
+				? queryLocales.ToArray()
+				: headerLocales;
+			return translated.GetLocalized(original, locales);
+		}
+
+		private string? GetLocalized(string? original, params string?[] locales)
+		{
+			foreach (string? locale in locales)
+			{
+				if (locale == null) continue;
+
+				string? translatedValue = translated
+					.FirstOrDefault(x =>
+						string.Equals(x.Key, locale, StringComparison.OrdinalIgnoreCase))
+					.Value?.Trim();
+				if (translatedValue?.Length > 0)
+					return translatedValue;
+
+				int separator = locale.IndexOfAny(['_', '-']);
+				string localeFirstPart = separator <= 0 ? locale : locale[..separator];
+				string? key = translated.Keys.FirstOrDefault(x =>
+					x.StartsWith($"{localeFirstPart}_", StringComparison.InvariantCultureIgnoreCase) ||
+					x.StartsWith($"{localeFirstPart}-", StringComparison.InvariantCultureIgnoreCase));
+				string? value = key != null ? translated[key].Trim() : null;
+				if (value?.Length > 0) return value;
+			}
+
+			return original;
+		}
 	}
 }

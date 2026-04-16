@@ -11,15 +11,8 @@ namespace OwnStream.Controllers.Api;
 [ApiController, Route("/api/home"), Authorize(AuthenticationSchemes = "ApiToken")]
 public class HomeController(DatabaseContext db) : Controller
 {
-	private string GetLocalizedString(string original, Dictionary<string, string> translated, string? locale)
-	{
-		if (locale != null && translated.ContainsKey(locale) && translated[locale].Trim().Length > 0)
-			return translated[locale];
-		return original;
-	}
-
 	[HttpGet("shelves")]
-	public IEnumerable<Shelf> GetShelves(string? locale = null)
+	public IEnumerable<Shelf> GetShelves()
 	{
 		List<Shelf> shelves = [];
 
@@ -50,18 +43,19 @@ public class HomeController(DatabaseContext db) : Controller
 					Id = x.ParentContentId,
 					EpisodeId = x.Id,
 					VideoId = x.Videos.First().Id,
-					Title = GetLocalizedString(x.ParentContent.Title, x.ParentContent.TranslatedTitle, locale),
+					Title = x.ParentContent.TranslatedTitle.GetLocalized(x.ParentContent.Title, HttpContext)!,
 					Subtitle =
 						x.ParentContent.Type switch
 						{
-							DatabaseContent.ContentType.Movie => [
+							DatabaseContent.ContentType.Movie =>
+							[
 								x.ParentContent.ReleasedAt.Year.ToString(),
 								(x.Videos.FirstOrDefault()?.Length ?? 0).Milliseconds().ToString("h", "m")
 							],
 							DatabaseContent.ContentType.Tv =>
 							[
 								$"S: {x.Season} E: {x.Episode}",
-								GetLocalizedString(x.Title, x.TranslatedTitle, locale),
+								x.TranslatedTitle.GetLocalized(x.Title, HttpContext)!,
 								(x.Videos.FirstOrDefault()?.Length ?? 0).Milliseconds().ToString("h", "m")
 							],
 							_ => []
@@ -90,7 +84,7 @@ public class HomeController(DatabaseContext db) : Controller
 					Id = x.Id,
 					EpisodeId = x.Episodes.FirstOrDefault()?.Id,
 					VideoId = x.Episodes.FirstOrDefault()?.Videos?.FirstOrDefault()?.Id,
-					Title = GetLocalizedString(x.Title, x.TranslatedTitle, locale),
+					Title = x.TranslatedTitle.GetLocalized(x.Title, HttpContext)!,
 					Subtitle = [x.ReleasedAt.Year.ToString()],
 					Image = x.Poster
 				})
@@ -108,7 +102,7 @@ public class HomeController(DatabaseContext db) : Controller
 				{
 					Type = "tv",
 					Id = x.Id,
-					Title = GetLocalizedString(x.Title, x.TranslatedTitle, locale),
+					Title = x.TranslatedTitle.GetLocalized(x.Title, HttpContext)!,
 					Subtitle = [x.ReleasedAt.Year.ToString()],
 					Image = x.Poster
 				})

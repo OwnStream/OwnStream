@@ -46,14 +46,7 @@
 		<a asp-action="Details" asp-route-id="@content.Id">
 			<img src="@content.Poster" alt="@content.Title">
 			<div class="title">
-				@if (content.TranslatedTitle.TryGetValue("en_US", out string? title) && title.Length > 0)
-				{
-					@title
-				}
-				else
-				{
-					@content.Title
-				}
+				@content.TranslatedTitle.GetLocalized(content.Title, Context)
 			</div>
 			<div class="info">@content.ReleasedAt.Year</div>
 		</a>

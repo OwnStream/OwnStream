@@ -2,9 +2,9 @@
 @model OwnStream.Database.Models.DatabaseContent
 
 @{
-	string title = (Model.TranslatedTitle.TryGetValue("en_US", out string? t) && t.Length > 0) ? t : Model.Title;
-	string tagline = (Model.TranslatedTagline.TryGetValue("en_US", out string? ta) && ta.Length > 0) ? ta : Model.Tagline;
-	string description = (Model.TranslatedDescription.TryGetValue("en_US", out string? d) && d.Length > 0) ? d : Model.Description;
+	string title = Model.TranslatedTitle.GetLocalized(Model.Title, Context);
+	string tagline = Model.TranslatedTagline.GetLocalized(Model.Tagline, Context);
+	string description = Model.TranslatedDescription.GetLocalized(Model.Description, Context);
 	ViewBag.Title = title;
 	Layout = "_Layout";
 }
@@ -64,8 +64,8 @@
 			<td>@(episode.Season)x@(episode.Episode)</td>
 			<td style="width: 170px"><img height="96" width="170" style="background: #333; display: block"
 			                              src="@episode.Thumbnail" alt="Thumbnail"></td>
-			<td>@episode.Title</td>
-			<td>@episode.Summary</td>
+			<td>@episode.TranslatedTitle.GetLocalized(episode.Title, Context)</td>
+			<td>@episode.TranslatedSummary.GetLocalized(episode.Summary, Context)</td>
 			<td>
 				@if (episode.Videos.Count > 0)
 				{
