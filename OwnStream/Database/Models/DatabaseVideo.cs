@@ -11,5 +11,6 @@ public class DatabaseVideo
 	public int Width { get; set; }
 	public int Height { get; set; }
 	public int Fps { get; set; }
+	public int Length { get; set; }
 	public string Language { get; set; }
 }

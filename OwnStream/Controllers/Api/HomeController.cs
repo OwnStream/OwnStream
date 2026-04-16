@@ -1,3 +1,4 @@
+using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -50,15 +51,18 @@ public class HomeController(DatabaseContext db) : Controller
 					EpisodeId = x.Id,
 					VideoId = x.Videos.First().Id,
 					Title = GetLocalizedString(x.ParentContent.Title, x.ParentContent.TranslatedTitle, locale),
-					// TODO: Runtime
 					Subtitle =
 						x.ParentContent.Type switch
 						{
-							DatabaseContent.ContentType.Movie => [x.ParentContent.ReleasedAt.Year.ToString()],
+							DatabaseContent.ContentType.Movie => [
+								x.ParentContent.ReleasedAt.Year.ToString(),
+								(x.Videos.FirstOrDefault()?.Length ?? 0).Milliseconds().ToString("h", "m")
+							],
 							DatabaseContent.ContentType.Tv =>
 							[
 								$"S: {x.Season} E: {x.Episode}",
-								GetLocalizedString(x.Title, x.TranslatedTitle, locale)
+								GetLocalizedString(x.Title, x.TranslatedTitle, locale),
+								(x.Videos.FirstOrDefault()?.Length ?? 0).Milliseconds().ToString("h", "m")
 							],
 							_ => []
 						},

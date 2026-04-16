@@ -1,3 +1,4 @@
+using Humanizer;
 using OwnStream.Database.Models;
 
 namespace OwnStream.ApiModels.Response;
@@ -29,6 +30,10 @@ public class Content(DatabaseContent content, string? locale)
 	public int? SeasonCount { get; set; } = content.Episodes.DistinctBy(x => x.Season).Count();
 	public int? EpisodeCount { get; set; } = content.Episodes.Count;
 	public int? VideoCount { get; set; } = content.Episodes.SelectMany(x => x.Videos).Count();
+
+	public string? Runtime { get; set; } = content.Episodes?.SelectMany(x => x.Videos)?.Select(x => x.Length).Sum()
+		.Milliseconds().ToString(@"hh\:mm\:ss");
+
 	public Dictionary<string, string> AgeRatings { get; set; } = content.AgeRatings;
 
 	public Dictionary<string, string> ExternalIds { get; set; } = new Dictionary<string, string?>()

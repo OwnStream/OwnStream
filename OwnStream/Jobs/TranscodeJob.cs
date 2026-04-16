@@ -224,6 +224,7 @@ public class TranscodeJob : IJob
 			Width = video.Width,
 			Height = video.Height,
 			Fps = (int)Math.Round(video.Framerate),
+			Length = (int)Math.Round(video.Duration.TotalMilliseconds),
 			Language = media.AudioStreams
 				.FirstOrDefault(x => x?.Language.Length > 0, media.AudioStreams.FirstOrDefault())
 				?.Language ?? "Unknown",

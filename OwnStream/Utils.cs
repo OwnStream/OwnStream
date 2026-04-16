@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using Konscious.Security.Cryptography;
 
@@ -23,5 +24,16 @@ public static class Utils
 		{
 			return new byte[32];
 		}
+	}
+
+	public static string ToString(this TimeSpan timeSpan, string h = "h", string m = "m")
+	{
+		StringBuilder sb = new();
+
+		if (timeSpan.TotalHours >= 1) sb.Append(Math.Floor(timeSpan.TotalHours)).Append(h).Append(' ');
+		if (timeSpan.Minutes > 0) sb.Append(timeSpan.Minutes).Append(m);
+		else if (timeSpan.TotalSeconds < 60) sb.Append("< 1").Append(m);
+
+		return sb.ToString();
 	}
 }
