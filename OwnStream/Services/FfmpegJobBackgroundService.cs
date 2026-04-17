@@ -5,8 +5,10 @@ using OwnStream.Jobs;
 
 namespace OwnStream.Services;
 
-public class FfmpegJobBackgroundService(IServiceScopeFactory scopeFactory, ILogger<FfmpegJobBackgroundService> logger)
-	: BackgroundService
+public class FfmpegJobBackgroundService(
+	IServiceScopeFactory scopeFactory,
+	ILogger<FfmpegJobBackgroundService> logger,
+	JobManager jobManager) : BackgroundService
 {
 	private readonly SemaphoreSlim singleJobLock = new(1, 1);
 
@@ -77,13 +79,10 @@ public class FfmpegJobBackgroundService(IServiceScopeFactory scopeFactory, ILogg
 		{
 			logger.LogInformation("Processing job {JobId}", job.Id);
 
-			IJob ijob = job.JobType switch
-			{
-				"TranscodeFull" => new TranscodeJob(),
-				"GenerateTrickplay" => new GenerateTrickplayJob(),
-				"FetchMetadata" => new FetchMetadataJob(),
-				_ => throw new Exception($"Unexpected job type '{job.JobType}'")
-			};
+			IJob? ijob = jobManager.GetJobInstance(job.JobType);
+
+			if (ijob == null)
+				throw new Exception($"Unexpected job type '{job.JobType}'");
 
 			ijob.Initialize(scope.ServiceProvider);
 			await ijob.ExecuteJob(job.Id, cancellationToken);

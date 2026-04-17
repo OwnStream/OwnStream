@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using OwnStream;
 using OwnStream.Database;
+using OwnStream.Jobs;
 using OwnStream.JsonConverter;
 using OwnStream.Services;
 
@@ -51,6 +52,7 @@ builder.Services.AddAuthentication(options =>
 		};
 	});
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<JobManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 
@@ -68,6 +70,9 @@ using (IServiceScope scope = app.Services.CreateScope())
 		db.Database.Migrate();
 		logger.LogInformation("Database migrations applied successfully");
 	}
+	
+	JobManager jobManager = scope.ServiceProvider.GetRequiredService<JobManager>();
+	jobManager.Init();
 }
 
 if (!app.Environment.IsDevelopment())

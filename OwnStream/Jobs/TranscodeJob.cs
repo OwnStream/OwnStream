@@ -9,6 +9,7 @@ using Xabe.FFmpeg.Streams.SubtitleStream;
 
 namespace OwnStream.Jobs;
 
+[Job("TranscodeFull")]
 public class TranscodeJob : IJob
 {
 	private DatabaseContext db = null!;

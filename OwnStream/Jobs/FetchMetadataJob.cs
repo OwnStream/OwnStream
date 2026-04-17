@@ -9,6 +9,7 @@ using TMDbLib.Objects.TvShows;
 
 namespace OwnStream.Jobs;
 
+[Job("FetchMetadata")]
 public class FetchMetadataJob : IJob
 {
 	private DatabaseContext db = null!;

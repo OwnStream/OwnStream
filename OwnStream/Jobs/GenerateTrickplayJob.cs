@@ -9,6 +9,7 @@ using Xabe.FFmpeg;
 
 namespace OwnStream.Jobs;
 
+[Job("GenerateTrickplay")]
 public class GenerateTrickplayJob : IJob
 {
 	private DatabaseContext db = null!;
