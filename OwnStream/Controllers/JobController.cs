@@ -38,7 +38,9 @@ public class JobController(DatabaseContext db) : Controller
 					DatabaseFfmpegJob.JobStatus.Failed => 1,
 					_ => throw new ArgumentOutOfRangeException()
 				};
-			}).ToArray();
+			})
+			.ThenByDescending(x => x.UpdatedAt)
+			.ToArray();
 		return View(jobs);
 	}
 

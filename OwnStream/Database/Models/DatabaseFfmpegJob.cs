@@ -16,6 +16,7 @@ public class DatabaseFfmpegJob
 	public int? ProgressMax { get; set; }
 	public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 	public DateTimeOffset? StartedAt { get; set; }
+	public DateTimeOffset? UpdatedAt { get; set; }
 	public DateTimeOffset? CompletedAt { get; set; }
 
 	public Guid? RelevantVideoId { get; set; }
