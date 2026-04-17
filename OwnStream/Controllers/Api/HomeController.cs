@@ -141,7 +141,7 @@ public class HomeController(DatabaseContext db) : Controller
 						},
 						Id = x.ParentContentId,
 						EpisodeId = x.Id,
-						VideoId = x.Videos.First().Id,
+						VideoId = x.Videos.FirstOrDefault()?.Id,
 						Title = x.ParentContent.TranslatedTitle.GetLocalized(x.ParentContent.Title, HttpContext)!,
 						Subtitle =
 							x.ParentContent.Type switch
