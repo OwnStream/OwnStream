@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers;
 
-[Authorize]
 public class VideoController(DatabaseContext db) : Controller
 {
 	public IActionResult Index() => View(db.Videos.Where(x => x.EpisodeId == null).ToArray());

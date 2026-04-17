@@ -216,6 +216,24 @@ public class TranscodeJob : IJob
 			CreatedAt = job.CreatedAt.AddSeconds(1),
 		};
 		db.FfmpegJobs.AddRange(trickplayJob, metadataJob);
+
+		if (args.Metadata["type"] == "tv")
+		{
+			DatabaseFfmpegJob fingerprintsJob = new()
+			{
+				Id = Guid.NewGuid(),
+				JobType = "DetectIntroSections",
+				InputPath = job.InputPath,
+				OutputPath = job.OutputPath,
+				Arguments = JsonSerializer.Serialize(new DetectIntroSectionsJob.Arguments
+				{
+					VideoId = args.VideoId 
+				}),
+				Status = DatabaseFfmpegJob.JobStatus.Pending,
+				CreatedAt = DateTimeOffset.UtcNow,
+			};
+			db.Add(fingerprintsJob);
+		}
 		await db.SaveChangesAsync(cancellationToken);
 
 		DatabaseVideo dbVideo = new()

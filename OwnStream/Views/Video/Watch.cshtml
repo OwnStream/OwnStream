@@ -97,6 +97,7 @@ else
 			subs.push(...subtitles);
 		}
 		const callback = setSubs(subs);
+		const sections = await fetch("/Media/@Model.Id/segments.json").then(x=>x.json());
 		window.player = new Player("video", {
 			author: {
 				icon: "URL of the author icon",
@@ -119,7 +120,18 @@ else
 				type: 'yt_l1',
 				src: "/Media/@Model.Id/trickplay/small.png"
 			},
-			hlsManifest: "/Media/@Model.Id/master.m3u8"
+			hlsManifest: "/Media/@Model.Id/master.m3u8",
+			segments: sections.map(x => ({
+				from: (x.leftStart / x.leftDuration) * 100,
+				to: ((x.leftStart + x.duration) / x.leftDuration) * 100,
+				color: "#00F",
+				onEnter: function (player) {
+					player.showSkipButton("Skip intro", x.leftStart + x.duration);
+				},
+				onExit: function (player) {
+					player.hideSkipButton();
+				}
+			}))
 		}, "hls.js");
 		window.player = player;
 		if (callback) callback();
