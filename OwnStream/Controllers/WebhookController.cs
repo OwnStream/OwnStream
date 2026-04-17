@@ -117,7 +117,7 @@ public class WebhookController(
 	}
 
 	[Route("/api/webhook/{id:guid}/sonarr")]
-	public IActionResult HandleSonarr([FromRoute] Guid id, [FromBody] SonarrWebhookBody body)
+	public async Task<IActionResult> HandleSonarr([FromRoute] Guid id, [FromBody] SonarrWebhookBody body)
 	{
 		DatabaseWebhook? webhook = db.Webhooks.Include(x => x.Library).FirstOrDefault(x => x.Id == id);
 		if (webhook == null) return NotFound();
@@ -149,7 +149,12 @@ public class WebhookController(
 			body.Series.TvdbId, body.Series.ImdbId, body.Series.TmdbId);
 
 		Guid videoId = Guid.NewGuid();
-		queueService.EnqueueAsync("TranscodeFull", body.EpisodeFile.Path,
+		DatabaseContent? relevantContent = db.Content
+			.Include(x => x.Episodes)
+			.FirstOrDefault(x =>
+				x.ImdbId == body.Series.ImdbId && x.TmdbId == body.Series.TmdbId && x.TvdbId == body.Series.TvdbId &&
+				x.TvMazeId == body.Series.TvMazeId && x.LibraryId == webhook.LibraryId);
+		DatabaseFfmpegJob job = await queueService.EnqueueAsync("TranscodeFull", body.EpisodeFile.Path,
 			Path.Join(webhook.Library.Path, videoId.ToString()),
 			new TranscodeJob.Arguments
 			{
@@ -180,9 +185,15 @@ public class WebhookController(
 					["imdbid"] = body.Series.ImdbId,
 					["tmdbid"] = body.Series.TmdbId.ToString()
 				}
-			});
+			},
+			relevantVideoId: null, // video doesn't exist yet, cannot set it
+			relevantWebhookId: webhook.Id,
+			relevantLibraryId: webhook.LibraryId,
+			relevantContentId: relevantContent?.Id,
+			relevantEpisodeId: relevantContent?.Episodes.FirstOrDefault(x =>
+				x.Season == body.Episodes[0].SeasonNumber && x.Episode == body.Episodes[0].EpisodeNumber)?.Id);
 
-		return Ok();
+		return Ok(job.Id);
 	}
 
 	// Only the parts we need are defined.

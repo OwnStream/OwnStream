@@ -29,12 +29,19 @@ public class FetchMetadataJob : IJob
 		Arguments? args = JsonSerializer.Deserialize<Arguments>(job.Arguments);
 		if (args == null) throw new Exception("Invalid arguments");
 
-		switch (args.Type)
+		(DatabaseContent Content, DatabaseEpisode? Episode) updatedItems = args.Type switch
 		{
-			case "movie": await FetchMovieMetadata(job, args, cancellationToken); break;
-			case "tv": await FetchShowMetadata(job, args, cancellationToken); break;
-			default: throw new IndexOutOfRangeException($"Unexpected metadata type '{args.Type}'");
-		}
+			"movie" => await FetchMovieMetadata(job, args, cancellationToken),
+			"tv" => await FetchShowMetadata(job, args, cancellationToken),
+			_ => throw new IndexOutOfRangeException($"Unexpected metadata type '{args.Type}'")
+		};
+
+		// Fill in relevant fields for the job if they're null
+		job.RelevantVideoId ??= args.VideoId;
+		job.RelevantContentId ??= updatedItems.Content.Id;
+		job.RelevantLibraryId ??= updatedItems.Content.LibraryId;
+		if (updatedItems.Episode != null)
+			job.RelevantEpisodeId ??= updatedItems.Episode?.Id;
 
 		await db.SaveChangesAsync(cancellationToken);
 	}
@@ -44,7 +51,7 @@ public class FetchMetadataJob : IJob
 		await tmdb.GetConfigAsync();
 	}
 
-	private async Task FetchMovieMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
+	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchMovieMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
 	{
 		Movie? tmdbMovie = null;
 		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
@@ -87,9 +94,10 @@ public class FetchMetadataJob : IJob
 		content.ReleasedAt = new DateTimeOffset(tmdbMovie?.ReleaseDate ?? DateTime.UnixEpoch).ToUniversalTime();
 		content.UpdatedAt = DateTimeOffset.UtcNow;
 
+		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
 		{
-			DatabaseEpisode episode = await GetEpisode(content.Id, 1, 1, cancellationToken);
+			episode = await GetEpisode(content.Id, 1, 1, cancellationToken);
 			episode.Title = "movie";
 			episode.Summary = "movie";
 			episode.UpdatedAt = DateTimeOffset.UtcNow;
@@ -103,9 +111,10 @@ public class FetchMetadataJob : IJob
 		}
 
 		await db.SaveChangesAsync(cancellationToken);
+		return (content, episode);
 	}
 
-	private async Task FetchShowMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
+	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchShowMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
 	{
 		TvShow? tmdbShow = null;
 		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
@@ -159,9 +168,10 @@ public class FetchMetadataJob : IJob
 			content.AgeRatings[rating.Iso_3166_1] = rating.Rating;
 		}
 
+		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
 		{
-			DatabaseEpisode episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
+			episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
 			
 			TvEpisode? tmdbEpisode = null;
 			if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbEId) && int.TryParse(sTmdbEId, out int tmdbIdE))
@@ -196,6 +206,7 @@ public class FetchMetadataJob : IJob
 		}
 
 		await db.SaveChangesAsync(cancellationToken);
+		return (content, episode);
 	}
 
 	private async Task<DatabaseContent> GetContent(Dictionary<string, string> providerIds,

@@ -33,6 +33,7 @@
 </table>
 <hr/>
 <a class="btn btn-secondary" id="watchButton">Loading episode to watch...</a>
+<a class="btn btn-secondary" asp-controller="Job" asp-action="Index" asp-route-relevantContent="@Model.Id">Relevant Jobs</a>
 <script>
 	const button = document.getElementById("watchButton")
 	fetch("/api/progress/upNext/@Model.Id")
@@ -78,6 +79,7 @@
 					<a class="btn btn-primary" asp-controller="Video" asp-action="Watch"
 					   asp-route-id="@episode.Videos.First().Id">Watch</a>
 				}
+				<a class="btn btn-secondary" asp-controller="Job" asp-action="Index" asp-route-relevantEpisode="@episode.Id">Relevant Jobs</a>
 			</td>
 		</tr>
 	}

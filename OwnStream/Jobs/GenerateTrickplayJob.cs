@@ -35,6 +35,7 @@ public class GenerateTrickplayJob : IJob
 		await db.SaveChangesAsync(cancellationToken);
 		DatabaseLibrary? library = await db.Libraries.FindAsync([args.LibraryId], cancellationToken);
 		if (library == null) throw new Exception("Invalid library ID");
+		job.RelevantLibraryId ??= library.Id;
 		string existingPath = Path.Join(library.Path, args.VideoId.ToString(), "trickplay");
 		if (Directory.Exists(existingPath)) Directory.Delete(existingPath, recursive: true);
 

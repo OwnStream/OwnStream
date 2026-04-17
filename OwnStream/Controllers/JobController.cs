@@ -8,12 +8,25 @@ namespace OwnStream.Controllers;
 [Authorize]
 public class JobController(DatabaseContext db) : Controller
 {
-	public IActionResult Index()
+	public IActionResult Index(
+		Guid? relevantVideo = null,
+		Guid? relevantEpisode = null,
+		Guid? relevantContent = null,
+		Guid? relevantLibrary = null,
+		Guid? relevantWebhook = null
+	)
 	{
-		DatabaseFfmpegJob[] jobs = db.FfmpegJobs
+		IQueryable<DatabaseFfmpegJob> query = db.FfmpegJobs
 			.OrderByDescending(x => x.CompletedAt)
-			.ThenByDescending(x => x.CreatedAt)
-			.ToArray()
+			.ThenByDescending(x => x.CreatedAt);
+
+		if (relevantVideo != null) query = query.Where(x => x.RelevantVideoId == relevantVideo);
+		if (relevantEpisode != null) query = query.Where(x => x.RelevantEpisodeId == relevantEpisode);
+		if (relevantContent != null) query = query.Where(x => x.RelevantContentId == relevantContent);
+		if (relevantLibrary != null) query = query.Where(x => x.RelevantLibraryId == relevantLibrary);
+		if (relevantWebhook != null) query = query.Where(x => x.RelevantWebhookId == relevantWebhook);
+		
+		DatabaseFfmpegJob[] jobs = query.ToArray()
 			.OrderByDescending(x =>
 			{
 				return x.Status switch

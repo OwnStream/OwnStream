@@ -179,6 +179,24 @@ public class TranscodeJob : IJob
 			}
 		}
 
+		DatabaseVideo dbVideo = new()
+		{
+			Id = args.VideoId,
+			EncodingSettings = MD5.HashData(Encoding.UTF8.GetBytes(
+				JsonSerializer.Serialize(args.Resolutions) + '\0' +
+				JsonSerializer.Serialize(args.AudioResolutions))),
+			Width = video.Width,
+			Height = video.Height,
+			Fps = (int)Math.Round(video.Framerate),
+			Length = (int)Math.Round(video.Duration.TotalMilliseconds),
+			Language = media.AudioStreams
+				.FirstOrDefault(x => x?.Language.Length > 0, media.AudioStreams.FirstOrDefault())
+				?.Language ?? "Unknown",
+			LibraryId = args.LibraryId
+		};
+		db.Videos.Add(dbVideo);
+		job.RelevantVideoId = args.VideoId;
+
 		DatabaseFfmpegJob trickplayJob = new()
 		{
 			Id = Guid.NewGuid(),
@@ -193,6 +211,11 @@ public class TranscodeJob : IJob
 			}),
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
 			CreatedAt = DateTimeOffset.UtcNow,
+			RelevantVideoId = job.RelevantVideoId,
+			RelevantEpisodeId = job.RelevantEpisodeId,
+			RelevantContentId = job.RelevantContentId,
+			RelevantLibraryId = job.RelevantLibraryId,
+			RelevantWebhookId = job.RelevantWebhookId,
 		};
 
 		DatabaseFfmpegJob metadataJob = new()
@@ -214,6 +237,11 @@ public class TranscodeJob : IJob
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
 			// We want it done as soon as possible, so abuse this field to make it run right after this job
 			CreatedAt = job.CreatedAt.AddSeconds(1),
+			RelevantVideoId = job.RelevantVideoId,
+			RelevantEpisodeId = job.RelevantEpisodeId,
+			RelevantContentId = job.RelevantContentId,
+			RelevantLibraryId = job.RelevantLibraryId,
+			RelevantWebhookId = job.RelevantWebhookId,
 		};
 		db.FfmpegJobs.AddRange(trickplayJob, metadataJob);
 
@@ -231,27 +259,14 @@ public class TranscodeJob : IJob
 				}),
 				Status = DatabaseFfmpegJob.JobStatus.Pending,
 				CreatedAt = DateTimeOffset.UtcNow,
+				RelevantVideoId = job.RelevantVideoId,
+				RelevantEpisodeId = job.RelevantEpisodeId,
+				RelevantContentId = job.RelevantContentId,
+				RelevantLibraryId = job.RelevantLibraryId,
+				RelevantWebhookId = job.RelevantWebhookId,
 			};
 			db.Add(fingerprintsJob);
 		}
-		await db.SaveChangesAsync(cancellationToken);
-
-		DatabaseVideo dbVideo = new()
-		{
-			Id = args.VideoId,
-			EncodingSettings = MD5.HashData(Encoding.UTF8.GetBytes(
-				JsonSerializer.Serialize(args.Resolutions) + '\0' +
-				JsonSerializer.Serialize(args.AudioResolutions))),
-			Width = video.Width,
-			Height = video.Height,
-			Fps = (int)Math.Round(video.Framerate),
-			Length = (int)Math.Round(video.Duration.TotalMilliseconds),
-			Language = media.AudioStreams
-				.FirstOrDefault(x => x?.Language.Length > 0, media.AudioStreams.FirstOrDefault())
-				?.Language ?? "Unknown",
-			LibraryId = args.LibraryId
-		};
-		db.Videos.Add(dbVideo);
 		await db.SaveChangesAsync(cancellationToken);
 	}
 

@@ -7,14 +7,32 @@ namespace OwnStream.Services;
 
 public interface IFfmpegJobQueueService
 {
-	Task<DatabaseFfmpegJob> EnqueueAsync(string jobType, string inputPath, string outputPath, object arguments);
+	Task<DatabaseFfmpegJob> EnqueueAsync(
+		string jobType,
+		string inputPath,
+		string outputPath,
+		object arguments,
+		Guid? relevantVideoId = null,
+		Guid? relevantEpisodeId = null,
+		Guid? relevantContentId = null,
+		Guid? relevantLibraryId = null,
+		Guid? relevantWebhookId = null);
+
 	Task<List<DatabaseFfmpegJob>> GetPendingJobsAsync();
 }
 
 public class FfmpegJobQueueService(IServiceScopeFactory scopeFactory) : IFfmpegJobQueueService
 {
-	public async Task<DatabaseFfmpegJob> EnqueueAsync(string jobType, string inputPath, string outputPath,
-		object arguments)
+	public async Task<DatabaseFfmpegJob> EnqueueAsync(
+		string jobType,
+		string inputPath,
+		string outputPath,
+		object arguments,
+		Guid? relevantVideoId = null,
+		Guid? relevantEpisodeId = null,
+		Guid? relevantContentId = null,
+		Guid? relevantLibraryId = null,
+		Guid? relevantWebhookId = null)
 	{
 		using IServiceScope scope = scopeFactory.CreateAsyncScope();
 		DatabaseContext db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
@@ -27,7 +45,12 @@ public class FfmpegJobQueueService(IServiceScopeFactory scopeFactory) : IFfmpegJ
 			OutputPath = outputPath,
 			Arguments = JsonSerializer.Serialize(arguments),
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
-			CreatedAt = DateTime.UtcNow
+			CreatedAt = DateTime.UtcNow,
+			RelevantVideoId = relevantVideoId,
+			RelevantEpisodeId = relevantEpisodeId,
+			RelevantContentId = relevantContentId,
+			RelevantLibraryId = relevantLibraryId,
+			RelevantWebhookId = relevantWebhookId
 		};
 
 		db.FfmpegJobs.Add(job);

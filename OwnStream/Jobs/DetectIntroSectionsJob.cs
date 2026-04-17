@@ -54,7 +54,16 @@ public class DetectIntroSectionsJob : IJob
 			.ThenInclude(x => x!.ParentContent)
 			.ThenInclude(x => x.Library)
 			.FirstOrDefault(x => x.Id == args.VideoId);
-		OtherEpisode[] otherEpisodes = thisVideo?.Episode?.ParentContent.Episodes
+
+		if (thisVideo == null) throw new Exception("Video not in the database?");
+		
+		// Fill in relevant fields for the job if they're null
+		job.RelevantVideoId ??= args.VideoId;
+		job.RelevantEpisodeId ??= thisVideo.EpisodeId;
+		job.RelevantContentId ??= thisVideo.Episode?.ParentContentId;
+		job.RelevantLibraryId ??= thisVideo.LibraryId;
+		
+		OtherEpisode[] otherEpisodes = thisVideo.Episode?.ParentContent.Episodes
 			                               .Where(x => x.Season == thisVideo.Episode?.Season)
 			                               .Where(x => x.Id != thisVideo.EpisodeId)
 			                               .Select(x => new OtherEpisode
