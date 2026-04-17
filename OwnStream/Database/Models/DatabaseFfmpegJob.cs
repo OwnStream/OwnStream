@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace OwnStream.Database.Models;
 
 public class DatabaseFfmpegJob
@@ -10,9 +12,15 @@ public class DatabaseFfmpegJob
 	public string Arguments { get; set; }
 	public JobStatus Status { get; set; }
 	public string? Message { get; set; }
+	public int? Progress { get; set; }
+	public int? ProgressMax { get; set; }
 	public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 	public DateTimeOffset? StartedAt { get; set; }
 	public DateTimeOffset? CompletedAt { get; set; }
+
+	[NotMapped]
+	public float? GetPercentage =>
+		Progress != null && ProgressMax != null ? ((float)Progress / (float)ProgressMax) * 100 : null;
 
 	public enum JobStatus
 	{

@@ -16,6 +16,7 @@
 		<td>Job Type</td>
 		<td>Status</td>
 		<td>Message</td>
+		<td>Progress</td>
 		<td>Times</td>
 		<td>Actions</td>
 	</tr>
@@ -27,20 +28,21 @@
 			<td><code>@job.Id.ToString()</code></td>
 			<td>@job.JobType</td>
 			<td>@job.Status.ToString()</td>
+			<td>@job.Message</td>
 			@{
-				if (job.Message?.StartsWith("%") == true)
+				if (job.GetPercentage != null)
 				{
 					<td>
-						@job.Message
-						<div class="progress" role="progressbar" aria-label="Disk usage" aria-valuenow="@job.Message.Replace("%", "")"
-						     aria-valuemin="0" aria-valuemax="100" style="display: inline-block;width: 200px;">
-							<div class="progress-bar h-100" style="width: @job.Message.Replace("%", "")%"></div>
+						@(job.ProgressMax == 100 ? job.Progress + "%" : job.Progress + " / " + job.ProgressMax)
+						<div class="progress" role="progressbar" aria-label="Disk usage" aria-valuenow="@job.Progress"
+						     aria-valuemin="0" aria-valuemax="@job.ProgressMax" style="display: inline-block;width: 200px;">
+							<div class="progress-bar h-100" style="width: @job.GetPercentage%"></div>
 						</div>
 					</td>
 				}
 				else
 				{
-					<td>@job.Message</td>
+					<td>No progress reported</td>
 				}
 			}
 			@{

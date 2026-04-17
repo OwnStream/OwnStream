@@ -125,12 +125,14 @@ public class TranscodeJob : IJob
 		conv.SetOutput(job.OutputPath + "/%v/index.m3u8");
 
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
+		job.Message = "Transcoding video...";
 		conv.OnProgress += async (_, eventArgs) =>
 		{
 			DateTimeOffset now = DateTimeOffset.UtcNow;
 			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
 			lastProgressUpdate = now;
-			job.Message = "%" + eventArgs.Percent;
+			job.Progress = eventArgs.Percent;
+			job.ProgressMax = 100;
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
 		};

@@ -52,12 +52,14 @@ public class GenerateTrickplayJob : IJob
 				.AddParameter("-r .2")
 				.SetOutput(Path.Join(tmp.FullName, "trickplay_medium_%d.png"));
 			DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
+			job.Message = "Extracting frames for medium preview";
 			conv.OnProgress += async (_, eventArgs) =>
 			{
 				DateTimeOffset now = DateTimeOffset.UtcNow;
 				if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
 				lastProgressUpdate = now;
-				job.Message = "%" + (eventArgs.Percent / 2);
+				job.Progress = eventArgs.Percent;
+				job.ProgressMax = 200;
 				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 				await db.SaveChangesAsync(cancellationToken);
 			};
@@ -105,12 +107,14 @@ public class GenerateTrickplayJob : IJob
 				.AddParameter($"-r {fps.ToString(System.Globalization.CultureInfo.InvariantCulture)}")
 				.SetOutput(Path.Join(tmp.FullName, "trickplay_small_%d.png"));
 			lastProgressUpdate = DateTimeOffset.MinValue;
+			job.Message = "Extracting frames for small preview";
 			conv.OnProgress += async (_, eventArgs) =>
 			{
 				DateTimeOffset now = DateTimeOffset.UtcNow;
 				if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
 				lastProgressUpdate = now;
-				job.Message = "%" + ((eventArgs.Percent / 2) + 50);
+				job.Progress = eventArgs.Percent + 100;
+				job.ProgressMax = 200;
 				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 				await db.SaveChangesAsync(cancellationToken);
 			};

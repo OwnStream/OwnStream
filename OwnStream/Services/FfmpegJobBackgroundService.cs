@@ -88,7 +88,8 @@ public class FfmpegJobBackgroundService(
 			await ijob.ExecuteJob(job.Id, cancellationToken);
 
 			job.Status = DatabaseFfmpegJob.JobStatus.Completed;
-			job.Message = null;
+			if (job.ProgressMax != null && job.Progress != job.ProgressMax)
+				job.Progress = job.ProgressMax;
 			job.CompletedAt = DateTime.UtcNow;
 			await db.SaveChangesAsync(cancellationToken);
 		}
