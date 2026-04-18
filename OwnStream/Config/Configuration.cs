@@ -24,5 +24,10 @@ public class Configuration
 		return config;
 	}
 
-	public void SaveConfiguration() => File.WriteAllText(ConfigPath, JsonSerializer.Serialize(this));
+	public void SaveConfiguration()
+	{
+		if (!Directory.Exists(Path.GetDirectoryName(ConfigPath)))
+			Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
+		File.WriteAllText(ConfigPath, JsonSerializer.Serialize(this));
+	}
 }
