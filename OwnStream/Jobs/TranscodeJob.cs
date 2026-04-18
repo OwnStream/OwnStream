@@ -14,7 +14,6 @@ public class TranscodeJob : IJob
 {
 	private DatabaseContext db = null!;
 	private Configuration config = null!;
-	private string[] hardwareEncoderSuffixes = ["amf", "nvenc", "qsv", "v4l2m2m", "vaapi", "vulkan"];
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
@@ -92,12 +91,15 @@ public class TranscodeJob : IJob
 						continue;
 				}
 			}
-			conv.AddParameter($"-map 0:v:{video.Index}");
+			conv.AddParameter($"-map 0:{video.Index}");
 			conv.AddParameter($"-filter:v:{videoIndex} scale={res.Width}:-2");
 			conv.AddParameter($"-b:v:{videoIndex} {res.Bitrate}");
 			conv.AddParameter($"-c:v:{videoIndex} {codec}");
 			videoStreams.Add(videoIndex, res.Name);
 		}
+
+		if (videoStreams.Count == 0)
+			throw new Exception($"No video streams were selected (input file was {video.Width}x{video.Height})");
 
 		foreach (IAudioStream audio in media.AudioStreams)
 		{
@@ -108,7 +110,7 @@ public class TranscodeJob : IJob
 			{
 				if (res.Channels > audio.Channels) continue;
 				int audioIndex = audioStreams.Count;
-				conv.AddParameter($"-map 0:a:{audioIndex}");
+				conv.AddParameter($"-map 0:{audio.Index}");
 				conv.AddParameter($"-b:a:{audioIndex} {res.Bitrate}");
 				conv.AddParameter($"-acodec:a:{audioIndex} {res.Codec}");
 				conv.AddParameter($"-ac:a:{audioIndex} {res.Channels}");
@@ -145,9 +147,10 @@ public class TranscodeJob : IJob
 		conv.AddParameter("-hls_flags independent_segments");
 		conv.AddParameter("-hls_playlist_type vod");
 		conv.AddParameter("-hls_segment_type fmp4");
-		conv.AddParameter("-hls_segment_filename " + job.OutputPath + "/%v/%05d.ts");
+		conv.AddParameter("-hls_segment_filename " + job.OutputPath + "/%v/%05d.m4s");
 		conv.AddParameter("-master_pl_name master.m3u8");
 		conv.SetOutput(job.OutputPath + "/%v/index.m3u8");
+		Console.WriteLine(conv.Build());
 
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
@@ -209,7 +212,7 @@ public class TranscodeJob : IJob
 		}
 
 		IMediaInfo info = await FFmpeg.GetMediaInfo(Path.Join(job.OutputPath, "master.m3u8"), cancellationToken);
-		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width)!;
+		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width);
 		string lang = string.Join(",", media.AudioStreams.Select(x => x.Language));
 		if (lang.Length == 0) lang = "und";
 
@@ -226,12 +229,24 @@ public class TranscodeJob : IJob
 		};
 		db.Videos.Add(dbVideo);
 		job.RelevantVideoId = args.VideoId;
+		job.Message = "Transcoding complete.";
+		if (args.DeleteAfterTranscode)
+		{
+			try
+			{
+				File.Delete(job.InputPath);
+			}
+			catch (Exception e)
+			{
+				job.Message = $"Transcoding complete, but failed to delete the input file ({e.Message})";
+			}
+		}
 
 		DatabaseFfmpegJob trickplayJob = new()
 		{
 			Id = Guid.NewGuid(),
 			JobType = "GenerateTrickplay",
-			InputPath = job.InputPath,
+			InputPath = Path.Join(job.OutputPath, "master.m3u8"),
 			OutputPath = job.OutputPath,
 			Arguments = JsonSerializer.Serialize(new GenerateTrickplayJob.Arguments
 			{
@@ -273,30 +288,27 @@ public class TranscodeJob : IJob
 			RelevantLibraryId = job.RelevantLibraryId,
 			RelevantWebhookId = job.RelevantWebhookId,
 		};
-		db.FfmpegJobs.AddRange(trickplayJob, metadataJob);
 
-		if (args.Metadata["type"] == "tv")
+		DatabaseFfmpegJob fingerprintsJob = new()
 		{
-			DatabaseFfmpegJob fingerprintsJob = new()
+			Id = Guid.NewGuid(),
+			JobType = "DetectIntroSections",
+			InputPath = Path.Join(job.OutputPath, "master.m3u8"),
+			OutputPath = job.OutputPath,
+			Arguments = JsonSerializer.Serialize(new DetectIntroSectionsJob.Arguments
 			{
-				Id = Guid.NewGuid(),
-				JobType = "DetectIntroSections",
-				InputPath = job.InputPath,
-				OutputPath = job.OutputPath,
-				Arguments = JsonSerializer.Serialize(new DetectIntroSectionsJob.Arguments
-				{
-					VideoId = args.VideoId 
-				}),
-				Status = DatabaseFfmpegJob.JobStatus.Pending,
-				CreatedAt = DateTimeOffset.UtcNow,
-				RelevantVideoId = job.RelevantVideoId,
-				RelevantEpisodeId = job.RelevantEpisodeId,
-				RelevantContentId = job.RelevantContentId,
-				RelevantLibraryId = job.RelevantLibraryId,
-				RelevantWebhookId = job.RelevantWebhookId,
-			};
-			db.Add(fingerprintsJob);
-		}
+				VideoId = args.VideoId
+			}),
+			Status = DatabaseFfmpegJob.JobStatus.Pending,
+			CreatedAt = DateTimeOffset.UtcNow,
+			RelevantVideoId = job.RelevantVideoId,
+			RelevantEpisodeId = job.RelevantEpisodeId,
+			RelevantContentId = job.RelevantContentId,
+			RelevantLibraryId = job.RelevantLibraryId,
+			RelevantWebhookId = job.RelevantWebhookId,
+		};
+		db.Add(fingerprintsJob);
+		db.FfmpegJobs.AddRange(metadataJob, fingerprintsJob, trickplayJob);
 		await db.SaveChangesAsync(cancellationToken);
 	}
 

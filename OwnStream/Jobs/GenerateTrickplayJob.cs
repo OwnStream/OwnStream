@@ -41,7 +41,7 @@ public class GenerateTrickplayJob : IJob
 
 		Directory.CreateDirectory(job.OutputPath);
 		Directory.CreateDirectory(Path.Join(job.OutputPath, "trickplay"));
-		IVideoStream video = media.VideoStreams.First();
+		IVideoStream video = media.VideoStreams.MaxBy(x => x.Width)!;
 
 		DirectoryInfo tmp = Directory.CreateTempSubdirectory("os_trickplay");
 		try

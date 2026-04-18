@@ -31,16 +31,8 @@ public class DetectIntroSectionsJob : IJob
 		await db.SaveChangesAsync(cancellationToken);
 
 		string fingerprintsPath = Path.Join(job.OutputPath, FingerprintsFileName);
-		FingerprintFile fingerprints;
-		if (!File.Exists(fingerprintsPath))
-		{
-			fingerprints = await GenerateFingerprints(job, fingerprintsPath, cancellationToken);
-		}
-		else
-		{
-			await using FileStream fs = File.OpenRead(fingerprintsPath);
-			fingerprints = FingerprintFile.ReadFromStream(fs);
-		}
+		if (!File.Exists(fingerprintsPath)) 
+			await GenerateFingerprints(job, fingerprintsPath, cancellationToken);
 
 		job.Message = "Loading other episodes...";
 		await db.SaveChangesAsync(cancellationToken);
@@ -237,17 +229,18 @@ public class DetectIntroSectionsJob : IJob
 		public bool MergeWithNext { get; set; }
 	}
 
-	private async Task<FingerprintFile> GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
+	private async Task GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
 		CancellationToken cancellationToken)
 	{
 		Conversion conv = new();
+		IMediaInfo hlsInfo = await FFmpeg.GetMediaInfo(job.InputPath, cancellationToken);
 		DirectoryInfo tmpDir = Directory.CreateTempSubdirectory("os_fingerprint_");
 
 		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
 		conv.AddParameter("-an", ParameterPosition.PreInput);
 		conv.AddParameter("-dn", ParameterPosition.PreInput);
 		conv.AddParameter("-sn", ParameterPosition.PreInput);
-		conv.AddParameter($"-i \"{job.InputPath}\"");
+		conv.AddStream(hlsInfo.VideoStreams.MaxBy(x => x.Width));
 		conv.AddParameter("-vf scale=128x128,fps=1");
 		conv.SetOutput(tmpDir.FullName + "/%07d.png");
 
@@ -300,8 +293,6 @@ public class DetectIntroSectionsJob : IJob
 		await File.WriteAllBytesAsync(outputDir, file.EncodeToBytes(), cancellationToken);
 
 		tmpDir.Delete(true);
-
-		return file;
 	}
 
 	public class Arguments
