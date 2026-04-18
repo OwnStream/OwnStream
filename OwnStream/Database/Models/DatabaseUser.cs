@@ -19,6 +19,9 @@ public class DatabaseUser
 			new(ClaimTypes.NameIdentifier, Id.ToString()),
 			new(ClaimTypes.Name, Username)
 		];
+		claims.AddRange(from permission in Enum.GetValues<UserPermissions>()
+			where permission != UserPermissions.None && Permissions.HasFlag(permission)
+			select new Claim(ClaimTypes.Role, permission.ToString()));
 
 		ClaimsIdentity identity = new(claims, "Cookies");
 		return new ClaimsPrincipal(identity);
@@ -29,5 +32,16 @@ public class DatabaseUser
 public enum UserPermissions
 {
 	None = 0,
-	Admin = 65535
+	ReadJobs = 1 << 0,
+	WriteJobs = 1 << 1,
+	ReadWebhooks = 1 << 2,
+	WriteWebhooks = 1 << 3,
+	WriteContent = 1 << 4,
+	WriteLibraries = 1 << 5,
+	WriteVideos = 1 << 6,
+	ReadAllUsers = 1 << 7,
+	WriteUsers = 1 << 8,
+
+	Admin = 0b1111111111111111,
+	Owner = 0b11111111111111111
 }

@@ -1,11 +1,8 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
-using OwnStream.Jobs;
 
 namespace OwnStream.Controllers;
 

@@ -14,10 +14,10 @@ public class WebhookController(
 	DatabaseContext db,
 	IFfmpegJobQueueService queueService) : Controller
 {
-	[Authorize]
+	[Authorize(Roles = nameof(UserPermissions.ReadWebhooks))]
 	public IActionResult Index() => View(db.Webhooks.ToArray());
 
-	[Authorize]
+	[Authorize(Roles = nameof(UserPermissions.ReadWebhooks))]
 	public IActionResult Detail(Guid id)
 	{
 		DatabaseWebhook? webhook = db.Webhooks.Find(id);
@@ -25,10 +25,10 @@ public class WebhookController(
 		return View(webhook);
 	}
 
-	[Authorize, HttpGet]
+	[Authorize(Roles = nameof(UserPermissions.WriteWebhooks)), HttpGet]
 	public IActionResult Create() => View(db.Libraries.ToArray());
 
-	[Authorize, HttpPost]
+	[Authorize(Roles = nameof(UserPermissions.WriteWebhooks)), HttpPost]
 	public async Task<IActionResult> Create([FromForm] string? name, [FromForm] string? authentication,
 		[FromForm] bool deleteOnConvert, [FromForm] Guid libraryId)
 	{

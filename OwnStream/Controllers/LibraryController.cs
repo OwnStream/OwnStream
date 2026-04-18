@@ -10,10 +10,10 @@ public class LibraryController(ILogger<LibraryController> logger, DatabaseContex
 {
 	public IActionResult Index() => View(db.Libraries.ToArray());
 
-	[HttpGet]
+	[Authorize(Roles = nameof(UserPermissions.WriteLibraries)), HttpGet]
 	public IActionResult Create() => View();
 
-	[HttpPost]
+	[Authorize(Roles = nameof(UserPermissions.WriteLibraries)), HttpPost]
 	public IActionResult Create([FromForm] string name, [FromForm] string path)
 	{
 		if (!Directory.Exists(path))

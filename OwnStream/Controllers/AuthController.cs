@@ -42,7 +42,7 @@ public class AuthController(DatabaseContext db) : Controller
 	public async Task<IActionResult> InitialSetup(string username, string password)
 	{
 		if (db.IsSetup()) return RedirectToAction("Login");
-		
+
 		if (username.Length == 0 || password.Length == 0) return RedirectToAction("InitialSetup");
 
 		DatabaseUser user = new()
@@ -50,7 +50,7 @@ public class AuthController(DatabaseContext db) : Controller
 			Id = Guid.NewGuid(),
 			Username = username,
 			PasswordHash = Utils.GetPasswordHash(username, password),
-			Permissions = UserPermissions.Admin
+			Permissions = UserPermissions.Owner
 		};
 		db.Users.Add(user);
 		await db.SaveChangesAsync();

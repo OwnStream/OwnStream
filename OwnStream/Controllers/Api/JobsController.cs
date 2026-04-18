@@ -6,10 +6,10 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/jobs/"), Authorize(AuthenticationSchemes = "ApiToken")]
+[ApiController, Route("/api/jobs/")]
 public class JobsController(DatabaseContext db) : Controller
 {
-	[Route("list")]
+	[Route("list"), Authorize(Roles = nameof(UserPermissions.ReadJobs), AuthenticationSchemes = "ApiToken")]
 	public PagedResponse<Job> GetJobs(long delta = 0, int page = 0, int limit = 20)
 	{
 		DateTimeOffset lastUpdated = DateTimeOffset.FromUnixTimeMilliseconds(delta);

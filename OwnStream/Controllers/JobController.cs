@@ -8,6 +8,7 @@ namespace OwnStream.Controllers;
 [Authorize]
 public class JobController(DatabaseContext db) : Controller
 {
+	[Authorize(Roles = nameof(UserPermissions.ReadJobs))]
 	public IActionResult Index(
 		Guid? relevantVideo = null,
 		Guid? relevantEpisode = null,
@@ -44,6 +45,7 @@ public class JobController(DatabaseContext db) : Controller
 		return View(jobs);
 	}
 
+	[Authorize(Roles = nameof(UserPermissions.WriteJobs))]
 	public IActionResult Requeue(Guid id,
 		Guid? relevantVideo = null,
 		Guid? relevantEpisode = null,

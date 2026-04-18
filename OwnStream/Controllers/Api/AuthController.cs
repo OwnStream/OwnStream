@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OwnStream.ApiModels;
 using OwnStream.ApiModels.Requests;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
@@ -24,10 +25,10 @@ public class AuthController(DatabaseContext db) : Controller
 	}
 
 	[HttpGet("whoami"), Authorize(AuthenticationSchemes = "ApiToken")]
-	public IActionResult WhoAmI()
+	public User WhoAmI()
 	{
 		DatabaseUser? user =
 			db.Users.Find(Guid.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value));
-		return Json(user);
+		return new User(user!);
 	}
 }
