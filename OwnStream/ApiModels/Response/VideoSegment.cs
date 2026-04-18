@@ -2,7 +2,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.ApiModels.Response;
 
-public class VideoSegments(DatabaseVideoSegment segment)
+public class VideoSegment(DatabaseVideoSegment segment)
 {
 	public Guid Id { get; set; } = segment.Id;
 	public string Type { get; set; } = segment.Type.ToString();

@@ -70,6 +70,6 @@ public class MediaController(DatabaseContext db) : Controller
 			.Where(x => x.VideoId == id)
 			.ToArray()
 			.OrderBy(x => x.StartMilliseconds)
-			.Select(x => new VideoSegments(x)));
+			.Select(x => new VideoSegment(x)));
 	}	
 }
