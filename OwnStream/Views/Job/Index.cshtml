@@ -74,7 +74,9 @@
 			<td>
 				@if (job.Status is DatabaseFfmpegJob.JobStatus.Completed or DatabaseFfmpegJob.JobStatus.Failed)
 				{
-					<a asp-action="Requeue" asp-route-id="@job.Id" class="btn btn-danger">Requeue</a>
+					Dictionary<string, string> q = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.First()!);
+					q.Add("id", job.Id.ToString());
+					<a asp-action="Requeue" asp-all-route-data="q" class="btn btn-danger">Requeue</a>
 				}
 			</td>
 		</tr>

@@ -44,11 +44,17 @@ public class JobController(DatabaseContext db) : Controller
 		return View(jobs);
 	}
 
-	public IActionResult Requeue(Guid id)
+	public IActionResult Requeue(Guid id,
+		Guid? relevantVideo = null,
+		Guid? relevantEpisode = null,
+		Guid? relevantContent = null,
+		Guid? relevantLibrary = null,
+		Guid? relevantWebhook = null)
 	{
 		DatabaseFfmpegJob? job = db.FfmpegJobs.Find(id);
 		job?.Status = DatabaseFfmpegJob.JobStatus.Pending;
 		db.SaveChanges();
-		return RedirectToAction("Index");
+		return RedirectToAction("Index",
+			new { relevantVideo, relevantEpisode, relevantContent, relevantLibrary, relevantWebhook });
 	}
 }
