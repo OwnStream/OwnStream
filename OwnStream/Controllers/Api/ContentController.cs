@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Response;
@@ -7,7 +8,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/content/"), Authorize(AuthenticationSchemes = "ApiToken")]
+[ApiController, Route("/api/content/"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
 public class ContentController(DatabaseContext db) : Controller
 {
 	[HttpGet("{id:guid}/details")]

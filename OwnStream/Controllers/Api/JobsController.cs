@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
@@ -9,7 +10,7 @@ namespace OwnStream.Controllers.Api;
 [ApiController, Route("/api/jobs/")]
 public class JobsController(DatabaseContext db) : Controller
 {
-	[Route("list"), Authorize(Roles = nameof(UserPermissions.ReadJobs), AuthenticationSchemes = "ApiToken")]
+	[Route("list"), Authorize(Roles = nameof(UserPermissions.ReadJobs), AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
 	public PagedResponse<Job> GetJobs(long delta = 0, int page = 0, int limit = 20)
 	{
 		DateTimeOffset lastUpdated = DateTimeOffset.FromUnixTimeMilliseconds(delta);

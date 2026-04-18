@@ -56,6 +56,15 @@ builder.Services.AddSingleton(Configuration.LoadConfiguration());
 builder.Services.AddSingleton<JobManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
+builder.Services.AddCors(options =>
+	{
+		options.AddPolicy("Api", policyBuilder =>
+		{
+			policyBuilder.AllowAnyOrigin();
+			policyBuilder.AllowAnyHeader();
+			policyBuilder.AllowAnyMethod();
+		});	
+	});
 
 WebApplication app = builder.Build();
 
@@ -84,7 +93,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 

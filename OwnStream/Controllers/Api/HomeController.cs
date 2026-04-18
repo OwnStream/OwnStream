@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Humanizer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Response;
@@ -9,7 +10,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/home"), Authorize(AuthenticationSchemes = "ApiToken")]
+[ApiController, Route("/api/home"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
 public class HomeController(DatabaseContext db) : Controller
 {
 	[HttpGet("shelves")]

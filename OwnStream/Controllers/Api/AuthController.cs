@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using OwnStream.ApiModels;
 using OwnStream.ApiModels.Requests;
@@ -9,7 +10,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/auth")]
+[ApiController, Route("/api/auth"), EnableCors("Api")]
 public class AuthController(DatabaseContext db) : Controller
 {
 	[HttpPost("login")]

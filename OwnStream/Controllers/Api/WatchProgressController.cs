@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Requests;
@@ -9,7 +10,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/progress/"), Authorize(AuthenticationSchemes = "Cookies,ApiToken")]
+[ApiController, Route("/api/progress/"), Authorize(AuthenticationSchemes = "Cookies,ApiToken"), EnableCors("Api")]
 public class WatchProgressController(DatabaseContext db) : Controller
 {
 	[HttpPost("update")]
