@@ -65,8 +65,9 @@ public class HomeController(DatabaseContext db) : Controller
 						Title = x.ParentContent.TranslatedTitle.GetLocalized(x.ParentContent.Title, HttpContext)!,
 						Subtitle =
 						[
-							"S: " + x.Season + "  E: " + x.Episode +
-							" - " + x.TranslatedTitle.GetLocalized(x.Title, HttpContext),
+							"S: " + x.Season + "  E: " + x.Episode,
+							x.TranslatedTitle.GetLocalized(x.Title, HttpContext)!,
+							(x.Videos.FirstOrDefault()?.Length ?? 0).Milliseconds().ToString("h", "m")
 						],
 						Image = x.Thumbnail,
 						WatchProgress = null
@@ -97,11 +98,19 @@ public class HomeController(DatabaseContext db) : Controller
 						Title = x.Content?.TranslatedTitle.GetLocalized(x.Content?.Title, HttpContext)!,
 						Subtitle = x.Content?.Type switch
 						{
-							DatabaseContent.ContentType.Movie => [],
+							DatabaseContent.ContentType.Movie =>
+							[
+								Math.Round((x.Episode?.Videos.FirstOrDefault()?.Length ?? 0) *
+								           ((100 - x.WatchPercentage) / 100)).Milliseconds().ToString("h", "m") +
+								" left"
+							],
 							DatabaseContent.ContentType.Tv =>
 							[
 								"S: " + x.Episode?.Season + "  E: " + x.Episode?.Episode,
-								x.Episode?.TranslatedTitle.GetLocalized(x.Episode?.Title, HttpContext)!
+								x.Episode?.TranslatedTitle.GetLocalized(x.Episode?.Title, HttpContext)!,
+								Math.Round((x.Episode?.Videos.FirstOrDefault()?.Length ?? 0) *
+								           ((100 - x.WatchPercentage) / 100)).Milliseconds().ToString("h", "m") +
+								" left"
 							],
 							_ => []
 						},
