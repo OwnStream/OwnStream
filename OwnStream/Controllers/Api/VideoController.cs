@@ -14,7 +14,9 @@ public class VideoController(DatabaseContext db) : Controller
 	[HttpGet("{id:guid}")]
 	public Video? Get(Guid id)
 	{
-		DatabaseVideo? video = db.Videos.Include(x => x.Library)
+		DatabaseVideo? video = db.Videos
+			.Include(x => x.Library)
+			.Include(x => x.VideoSegments)
 			.FirstOrDefault(x => x.Id == id);
 
 		if (video == null)
@@ -28,7 +30,8 @@ public class VideoController(DatabaseContext db) : Controller
 		{
 			Subtitles = GetSubtitles(video),
 			PreviewFiles = GetPreviewFiles(video),
-			Episode = ep != null ? new Episode(ep) : null
+			Episode = ep != null ? new Episode(ep) : null,
+			Segments = video.VideoSegments.Select(x => new VideoSegment(x))
 		};
 	}
 
