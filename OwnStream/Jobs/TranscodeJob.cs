@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -250,7 +249,6 @@ public class TranscodeJob : IJob
 			OutputPath = job.OutputPath,
 			Arguments = JsonSerializer.Serialize(new GenerateTrickplayJob.Arguments
 			{
-				DeleteAfterTranscode = args.DeleteAfterTranscode,
 				VideoId = args.VideoId,
 				LibraryId = args.LibraryId
 			}),

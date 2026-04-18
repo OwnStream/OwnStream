@@ -41,29 +41,37 @@ public class GenerateTrickplayJob : IJob
 
 		Directory.CreateDirectory(job.OutputPath);
 		Directory.CreateDirectory(Path.Join(job.OutputPath, "trickplay"));
-		IVideoStream video = media.VideoStreams.MaxBy(x => x.Width)!;
 
 		DirectoryInfo tmp = Directory.CreateTempSubdirectory("os_trickplay");
 		try
 		{
+			IVideoStream video = media.VideoStreams.MaxBy(x => x.Width)!;
+			double durationSeconds = video.Duration.TotalSeconds;
+			double smallFps = 100.0 / durationSeconds;
+
 			IConversion conv = new Conversion()
 				.AddParameter("-hide_banner", ParameterPosition.PreInput)
-				.AddStream(video.SetCodec(VideoCodec.png))
-				.AddParameter("-vf scale=-2:180")
-				.AddParameter("-r .2")
-				.SetOutput(Path.Join(tmp.FullName, "trickplay_medium_%d.png"));
+				.AddParameter($"-i \"{job.InputPath}\"")
+				.AddParameter(
+					$"-filter_complex \"[0:v]split=2[base1][base2];" +
+					$"[base1]scale=-2:180,fps=1/5[medium];" +
+					$"[base2]scale=-2:27,fps=100/{video.Duration.TotalSeconds.ToFFmpegFormat(2)}[small]\"")
+				.AddParameter($"-map \"[medium]\" \"{Path.Join(tmp.FullName, "trickplay_medium_%d.png")}\"")
+				.AddParameter($"-map \"[small]\" \"{Path.Join(tmp.FullName, "trickplay_small_%d.png")}\"");
+
 			DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
-			job.Message = "Extracting frames for medium preview";
+			job.Message = "Extracting frames for trickplay";
+			job.ProgressMax = 100;
 			conv.OnProgress += async (_, eventArgs) =>
 			{
 				DateTimeOffset now = DateTimeOffset.UtcNow;
 				if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
 				lastProgressUpdate = now;
 				job.Progress = eventArgs.Percent;
-				job.ProgressMax = 200;
 				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 				await db.SaveChangesAsync(cancellationToken);
 			};
+
 			await conv.Start(cancellationToken);
 
 			await db.SaveChangesAsync(cancellationToken);
@@ -99,31 +107,6 @@ public class GenerateTrickplayJob : IJob
 					cancellationToken);
 			}
 
-			double durationSeconds = video.Duration.TotalSeconds;
-			double fps = 100.0 / durationSeconds;
-			conv = new Conversion()
-				.AddParameter("-hide_banner", ParameterPosition.PreInput)
-				.AddStream(video.SetCodec(VideoCodec.png))
-				.AddParameter("-vf scale=-2:27")
-				.AddParameter($"-r {fps.ToString(System.Globalization.CultureInfo.InvariantCulture)}")
-				.SetOutput(Path.Join(tmp.FullName, "trickplay_small_%d.png"));
-			lastProgressUpdate = DateTimeOffset.MinValue;
-			job.Message = "Extracting frames for small preview";
-			conv.OnProgress += async (_, eventArgs) =>
-			{
-				DateTimeOffset now = DateTimeOffset.UtcNow;
-				if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
-				lastProgressUpdate = now;
-				job.Progress = eventArgs.Percent + 100;
-				job.ProgressMax = 200;
-				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-				await db.SaveChangesAsync(cancellationToken);
-			};
-			await conv.Start(cancellationToken);
-
-			job.Message = "Building small trickplay...";
-			await db.SaveChangesAsync(cancellationToken);
-
 			string[] smallImages = Directory.GetFiles(tmp.FullName, "trickplay_small_*.png")
 				.OrderBy(f => int.Parse(Path.GetFileNameWithoutExtension(f).Split('_').Last()))
 				.ToArray();
@@ -153,18 +136,6 @@ public class GenerateTrickplayJob : IJob
 			}
 
 			tmp.Delete(true);
-
-			if (args.DeleteAfterTranscode)
-			{
-				try
-				{
-					File.Delete(job.InputPath);
-				}
-				catch (Exception)
-				{
-					// Ignored
-				}
-			}
 		}
 		catch (Exception)
 		{
@@ -175,7 +146,6 @@ public class GenerateTrickplayJob : IJob
 
 	public class Arguments
 	{
-		public bool DeleteAfterTranscode { get; set; }
 		public Guid VideoId { get; set; }
 		public Guid LibraryId { get; set; }
 	}
