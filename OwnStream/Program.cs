@@ -52,6 +52,7 @@ builder.Services.AddAuthentication(options =>
 		};
 	});
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton(Configuration.LoadConfiguration());
 builder.Services.AddSingleton<JobManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();

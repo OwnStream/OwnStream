@@ -88,20 +88,6 @@ public class WebhookController(
 			{
 				VideoId = videoId,
 				LibraryId = webhook.LibraryId,
-				// TODO: Get from settings
-				Resolutions =
-				[
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "360p", Width = 640, Bitrate = 3000000, Codec = "h264_nvenc" },
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "720p", Width = 1280, Bitrate = 7000000, Codec = "h264_nvenc" },
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "1080p", Width = 1920, Bitrate = 15000000, Codec = "hevc_nvenc" }
-				],
-				AudioResolutions =
-				[
-					new TranscodeJob.Arguments.AudioResolutionInfo { Bitrate = 128000, Channels = 2, Codec = "aac" }
-				],
 				DeleteAfterTranscode = webhook.DeleteOnConvert,
 				Metadata = new Dictionary<string, string>()
 				{
@@ -160,20 +146,6 @@ public class WebhookController(
 			{
 				VideoId = videoId,
 				LibraryId = webhook.LibraryId,
-				// TODO: Get from settings
-				Resolutions =
-				[
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "360p", Width = 640, Bitrate = 3000000, Codec = "h264_nvenc" },
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "720p", Width = 1280, Bitrate = 7000000, Codec = "h264_nvenc" },
-					new TranscodeJob.Arguments.ResolutionInfo
-						{ Name = "1080p", Width = 1920, Bitrate = 15000000, Codec = "hevc_nvenc" }
-				],
-				AudioResolutions =
-				[
-					new TranscodeJob.Arguments.AudioResolutionInfo { Bitrate = 128000, Channels = 2, Codec = "aac" }
-				],
 				DeleteAfterTranscode = webhook.DeleteOnConvert,
 				Metadata = new Dictionary<string, string>()
 				{

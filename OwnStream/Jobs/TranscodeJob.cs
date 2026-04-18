@@ -13,10 +13,13 @@ namespace OwnStream.Jobs;
 public class TranscodeJob : IJob
 {
 	private DatabaseContext db = null!;
+	private Configuration config = null!;
+	private string[] hardwareEncoderSuffixes = ["amf", "nvenc", "qsv", "v4l2m2m", "vaapi", "vulkan"];
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
 		db = serviceProvider.GetRequiredService<DatabaseContext>();
+		config = serviceProvider.GetRequiredService<Configuration>();
 	}
 
 	public async Task ExecuteJob(Guid jobId, CancellationToken cancellationToken)
@@ -31,6 +34,8 @@ public class TranscodeJob : IJob
 		Conversion conv = new();
 		Arguments? args = JsonSerializer.Deserialize<Arguments>(job.Arguments);
 		if (args == null) throw new Exception("Invalid arguments");
+		
+		if (!config.Transcode.IsValid()) throw new Exception("Invalid transcoding configuration");
 
 		job.Message = "Checking for existing video...";
 		await db.SaveChangesAsync(cancellationToken);
@@ -55,33 +60,53 @@ public class TranscodeJob : IJob
 		Dictionary<int, string> videoStreams = [];
 		Dictionary<int, string> audioStreams = [];
 		conv.AddParameter($"-i \"{job.InputPath}\"");
-		foreach (Arguments.ResolutionInfo res in args.Resolutions)
+		foreach (TranscodeConfiguration.VideoPreset res in
+		         config.Transcode.VideoPresets.OrderByDescending(x => x.Width))
 		{
 			if (video.Width < res.Width) continue;
 
 			int videoIndex = videoStreams.Count;
+			if (videoIndex >= config.Transcode.MaxVideoStreams) continue;
+			string codec = res.Codec;
+			if (video.PixelFormat.EndsWith("10le"))
+			{
+				// 10-bit color isn't always supported on all clients / encoders
+				switch (config.Transcode.PixelFormatHandling)
+				{
+					case TranscodeConfiguration.PixFmtHandling.DownsampleIfUnsupported:
+						if (res.Codec == "h264_nvenc") // TODO: Add more codecs that can't do 10-bit color
+							conv.AddParameter($"-pix_fmt:v:{videoIndex} {video.PixelFormat.Replace("10le", "")}");
+						break;
+					case TranscodeConfiguration.PixFmtHandling.DownsampleAlways:
+						conv.AddParameter($"-pix_fmt:v:{videoIndex} {video.PixelFormat.Replace("10le", "")}");
+						break;
+					case TranscodeConfiguration.PixFmtHandling.UseSoftware:
+						int underscore = res.Codec.IndexOf('_');
+						if (underscore > 0)
+						{
+							string hw = res.Codec[underscore..];
+							codec = res.Codec.Replace($"_{hw}", "");
+						}
+						break;
+					default:
+						continue;
+				}
+			}
 			conv.AddParameter($"-map 0:v:{video.Index}");
 			conv.AddParameter($"-filter:v:{videoIndex} scale={res.Width}:-2");
 			conv.AddParameter($"-b:v:{videoIndex} {res.Bitrate}");
-			conv.AddParameter($"-c:v:{videoIndex} {res.Codec}");
-			if (video.PixelFormat.EndsWith("10le") && res.Codec == "h264_nvenc")
-			{
-				// h264_nvenc cannot do 10-bit color.
-				// TODO: Use an option to either
-				//       - skip
-				//       - fallback to software
-				//       - fallback to another codec (hevc_nvenc)
-				//       - Convert to non-10-bit pixfmt
-				conv.AddParameter($"-pix_fmt:v:{videoIndex} {video.PixelFormat.Replace("10le", "")}");
-			}
-
+			conv.AddParameter($"-c:v:{videoIndex} {codec}");
 			videoStreams.Add(videoIndex, res.Name);
 		}
 
 		foreach (IAudioStream audio in media.AudioStreams)
 		{
-			foreach (Arguments.AudioResolutionInfo res in args.AudioResolutions)
+			if (config.Transcode.AudioLanguages.Count > 0 &&
+			    !config.Transcode.AudioLanguages.Contains(audio.Language) && 
+			    audio.Language != "und") continue;
+			foreach (TranscodeConfiguration.AudioPreset res in config.Transcode.AudioPresets)
 			{
+				if (res.Channels > audio.Channels) continue;
 				int audioIndex = audioStreams.Count;
 				conv.AddParameter($"-map 0:a:{audioIndex}");
 				conv.AddParameter($"-b:a:{audioIndex} {res.Bitrate}");
@@ -155,22 +180,26 @@ public class TranscodeJob : IJob
 			name.Append($".{subtitle.Index}");
 			try
 			{
+				bool isBitmap = subtitle.Codec == "hdmv_pgs_subtitle";
 				string extension = subtitle.Codec switch
 				{
 					"webvtt" => "vtt",
 					"subrip" => "srt",
 					"ssa" => "ssa",
 					"ass" => "ass",
+					"hdmv_pgs_subtitle" => "pgs",
 					_ => throw new IndexOutOfRangeException("Unknown subtitle codec: " + subtitle.Codec)
 				};
 				IConversion subConv = new Conversion()
 					.AddStream(subtitle)
 					.SetOutput(Path.Join(job.OutputPath, "captions", $"{name}.{extension}"));
 				await subConv.Start(cancellationToken);
-				if (subtitle.Codec != "vtt") continue;
+
+				// Try to convert text-based subtitles to WebVTT for web playback
+				if (isBitmap && extension != "vtt") continue;
 				subConv = new Conversion()
 					.AddStream(subtitle.SetCodec(SubtitleCodec.webvtt))
-					.SetOutput(Path.Join(job.OutputPath, "captions", name + ".vtt"));
+					.SetOutput(Path.Join(job.OutputPath, "captions", $"{name}.vtt"));
 				await subConv.Start(cancellationToken);
 			}
 			catch (Exception)
@@ -179,19 +208,20 @@ public class TranscodeJob : IJob
 			}
 		}
 
+		IMediaInfo info = await FFmpeg.GetMediaInfo(Path.Join(job.OutputPath, "master.m3u8"), cancellationToken);
+		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width)!;
+		string lang = string.Join(",", media.AudioStreams.Select(x => x.Language));
+		if (lang.Length == 0) lang = "und";
+
 		DatabaseVideo dbVideo = new()
 		{
 			Id = args.VideoId,
-			EncodingSettings = MD5.HashData(Encoding.UTF8.GetBytes(
-				JsonSerializer.Serialize(args.Resolutions) + '\0' +
-				JsonSerializer.Serialize(args.AudioResolutions))),
-			Width = video.Width,
-			Height = video.Height,
-			Fps = (int)Math.Round(video.Framerate),
-			Length = (int)Math.Round(video.Duration.TotalMilliseconds),
-			Language = media.AudioStreams
-				.FirstOrDefault(x => x?.Language.Length > 0, media.AudioStreams.FirstOrDefault())
-				?.Language ?? "Unknown",
+			EncodingSettings = config.Transcode.GetHash(),
+			Width = bestVideoStream.Width,
+			Height = bestVideoStream.Height,
+			Fps = (int)Math.Round(bestVideoStream.Framerate),
+			Length = (int)Math.Round(bestVideoStream.Duration.TotalMilliseconds),
+			Language = lang,
 			LibraryId = args.LibraryId
 		};
 		db.Videos.Add(dbVideo);
@@ -272,26 +302,9 @@ public class TranscodeJob : IJob
 
 	public class Arguments
 	{
-		public ResolutionInfo[] Resolutions { get; set; }
-		public AudioResolutionInfo[] AudioResolutions { get; set; }
 		public bool DeleteAfterTranscode { get; set; }
 		public Dictionary<string, string> Metadata { get; set; }
 		public Guid VideoId { get; set; }
 		public Guid LibraryId { get; set; }
-
-		public class ResolutionInfo
-		{
-			public string Name { get; set; }
-			public int Width { get; set; }
-			public int Bitrate { get; set; }
-			public string Codec { get; set; }
-		}
-
-		public class AudioResolutionInfo
-		{
-			public int Bitrate { get; set; }
-			public int Channels { get; set; }
-			public string Codec { get; set; }
-		}
 	}
 }
