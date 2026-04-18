@@ -53,6 +53,12 @@ public class DatabaseContext : DbContext
 		modelBuilder.Entity<DatabaseContent>().Property(x => x.AgeRatings).HasColumnType("jsonb");
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedTitle).HasColumnType("jsonb");
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedSummary).HasColumnType("jsonb");
+
+		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantVideo).WithMany().HasForeignKey(x => x.RelevantVideoId).OnDelete(DeleteBehavior.SetNull);
+		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantEpisode).WithMany().HasForeignKey(x => x.RelevantEpisodeId).OnDelete(DeleteBehavior.SetNull);
+		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantContent).WithMany().HasForeignKey(x => x.RelevantContentId).OnDelete(DeleteBehavior.SetNull);
+		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantLibrary).WithMany().HasForeignKey(x => x.RelevantLibraryId).OnDelete(DeleteBehavior.SetNull);
+		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantWebhook).WithMany().HasForeignKey(x => x.RelevantWebhookId).OnDelete(DeleteBehavior.SetNull);
 	}
 
 	public bool IsSetup() => Users.Any();
