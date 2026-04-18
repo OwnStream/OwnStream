@@ -179,13 +179,21 @@ public class WatchProgressController(DatabaseContext db) : Controller
 		DatabaseEpisode watchingEpisode = mostRecentWatchProgress.Episode!;
 		DatabaseEpisode farthestEpisode = farthestWatchProgress?.Episode ?? watchingEpisode;
 		DatabaseEpisode? nextEpisode = db.Episode
-			.Include(x => x.Videos)
-			.Where(x => x.ParentContentId == id)
-			.Where(x => x.Season > farthestEpisode.Season ||
-			            (x.Season == farthestEpisode.Season && x.Episode > farthestEpisode.Episode))
-			.OrderBy(x => x.Season)
-			.ThenBy(x => x.Episode)
-			.FirstOrDefault();
+			                               .Include(x => x.Videos)
+			                               .Where(x => x.ParentContentId == id)
+			                               .Where(x => x.Season > farthestEpisode.Season ||
+			                                           (x.Season == farthestEpisode.Season &&
+			                                            x.Episode > farthestEpisode.Episode))
+			                               .OrderBy(x => x.Season)
+			                               .ThenBy(x => x.Episode)
+			                               .FirstOrDefault() ??
+		                               // Fallback, show the first episode of the show
+		                               db.Episode
+			                               .Include(x => x.Videos)
+			                               .Where(x => x.ParentContentId == id)
+			                               .OrderBy(x => x.Season)
+			                               .ThenBy(x => x.Episode)
+			                               .FirstOrDefault();
 
 		return new EpisodeToWatchResponse
 		{
