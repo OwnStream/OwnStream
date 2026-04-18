@@ -122,12 +122,6 @@ public class ContentController(DatabaseContext db) : Controller
 			.ThenBy(x => x.Episode)
 			.FirstOrDefault();
 
-		if (nextEpisode == null)
-		{
-			Response.StatusCode = 404;
-			return null;
-		}
-
-		return new Episode(nextEpisode, HttpContext);
+		return nextEpisode == null ? null : new Episode(nextEpisode, HttpContext);
 	}
 }
