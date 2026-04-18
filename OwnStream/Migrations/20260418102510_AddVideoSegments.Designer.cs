@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OwnStream.Database;
@@ -12,9 +13,11 @@ using OwnStream.Database;
 namespace OwnStream.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260418102510_AddVideoSegments")]
+    partial class AddVideoSegments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -335,9 +338,6 @@ namespace OwnStream.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
-                    b.Property<int>("VideoDuration")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("VideoId")
                         .HasColumnType("uuid");
 
@@ -493,7 +493,7 @@ namespace OwnStream.Migrations
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseVideoSegment", b =>
                 {
                     b.HasOne("OwnStream.Database.Models.DatabaseVideo", "Video")
-                        .WithMany("VideoSegments")
+                        .WithMany()
                         .HasForeignKey("VideoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -564,8 +564,6 @@ namespace OwnStream.Migrations
 
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseVideo", b =>
                 {
-                    b.Navigation("VideoSegments");
-
                     b.Navigation("WatchProgresses");
                 });
 #pragma warning restore 612, 618

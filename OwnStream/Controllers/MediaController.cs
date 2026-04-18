@@ -66,60 +66,13 @@ public class MediaController(DatabaseContext db) : Controller
 	[Route("/Media/{id:guid}/segments.json")]
 	public IActionResult Segments(Guid id)
 	{
-		IIncludableQueryable<DatabaseVideo, DatabaseLibrary> q = db.Videos
-			.Include(x => x.Library)
-			.Include(x => x.Episode)
-			.ThenInclude(x => x!.ParentContent)
-			.ThenInclude(x => x.Episodes)
-			.ThenInclude(x => x.Videos)
-			.Include(x => x.Episode)
-			.ThenInclude(x => x!.ParentContent)
-			.ThenInclude(x => x.Library);
-		DatabaseVideo? thisVideo = q.FirstOrDefault(x => x.Id == id);
-		using FileStream? fs1 = thisVideo != null
-			? System.IO.File.OpenRead(Path.Join(thisVideo.Library.Path, thisVideo.Id.ToString(), "fingerprints.fp"))
-			: null;
-		DetectIntroSectionsJob.FingerprintFile? thisFile =
-			fs1 != null ? DetectIntroSectionsJob.FingerprintFile.ReadFromStream(fs1) : null;
-		if (thisFile == null) return NotFound("fp1 not found");
+		DatabaseVideo? video = db.Videos.Find(id);
+		if (video == null) return NotFound();
 
-
-		DetectIntroSectionsJob.OtherEpisode[] otherEpisodes = thisVideo?.Episode?.ParentContent.Episodes
-			.Where(x => x.Season == thisVideo.Episode?.Season)
-			.Where(x => x.Id != thisVideo.EpisodeId)
-			.Select(x =>
-			{
-				DatabaseVideo? video = x.Videos.FirstOrDefault();
-				return video != null
-					? new DetectIntroSectionsJob.OtherEpisode
-					{
-						VideoId = video.Id,
-						EpisodeId = x.Id,
-						LibraryId = x.ParentContent.LibraryId,
-						SeasonNum = x.Season,
-						EpisodeNum = x.Episode,
-						Path = Path.Join(
-							x.ParentContent.Library.Path,
-							video.Id.ToString())
-					}
-					: null;
-			})
-			.Where(x => x != null)
-			.Cast<DetectIntroSectionsJob.OtherEpisode>()
-			.ToArray() ?? [];
-		List<DetectIntroSectionsJob.SimilarRange> allRanges = [];
-
-		foreach (DetectIntroSectionsJob.OtherEpisode otherEpisode in otherEpisodes)
-		{
-			otherEpisode.LoadFile();
-			if (otherEpisode.File == null) continue;
-			byte[,] similarity = DetectIntroSectionsJob.CompareFiles(thisFile, otherEpisode.File);
-			DetectIntroSectionsJob.SimilarRange[] ranges = DetectIntroSectionsJob.GetSimilarRanges(similarity, 200, 30);
-			allRanges.AddRange(ranges);
-		}
-		
-		allRanges = DetectIntroSectionsJob.MergeRanges(allRanges);
-
-		return Json(allRanges);
-	}
+		return Json(db.VideoSegments
+			.Where(x => x.VideoId == id)
+			.ToArray()
+			.OrderBy(x => x.StartMilliseconds)
+			.Select(x => new VideoSegments(x)));
+	}	
 }

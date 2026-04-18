@@ -16,6 +16,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseContent> Content { get; set; }
 	public DbSet<DatabaseEpisode> Episode { get; set; }
 	public DbSet<DatabaseWatchProgress> WatchProgress { get; set; }
+	public DbSet<DatabaseVideoSegment> VideoSegments { get; set; }
 
 	private static void PrepareDataSource()
 	{

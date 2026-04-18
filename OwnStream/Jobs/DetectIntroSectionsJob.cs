@@ -62,26 +62,83 @@ public class DetectIntroSectionsJob : IJob
 		job.RelevantEpisodeId ??= thisVideo.EpisodeId;
 		job.RelevantContentId ??= thisVideo.Episode?.ParentContentId;
 		job.RelevantLibraryId ??= thisVideo.LibraryId;
-		
-		OtherEpisode[] otherEpisodes = thisVideo.Episode?.ParentContent.Episodes
-			                               .Where(x => x.Season == thisVideo.Episode?.Season)
-			                               .Where(x => x.Id != thisVideo.EpisodeId)
-			                               .Select(x => new OtherEpisode
-			                               {
-				                               VideoId = x.Videos.First().Id,
-				                               EpisodeId = x.Id,
-				                               LibraryId = x.ParentContent.LibraryId,
-				                               SeasonNum = x.Season,
-				                               EpisodeNum = x.Episode,
-				                               Path = Path.Join(x.ParentContent.Library.Path,
-					                               x.Videos.First().Id.ToString())
-			                               }).ToArray()
-		                               ?? [];
-		foreach (OtherEpisode otherEpisode in otherEpisodes) otherEpisode.LoadFile();
-		otherEpisodes = otherEpisodes.Where(x => x.File != null).ToArray();
 
-		job.Message = $"Found {otherEpisodes.Length} other episodes to compare to.";
-		await db.SaveChangesAsync(cancellationToken);
+		OtherEpisode[] seasonEpisodes = thisVideo.Episode?.ParentContent.Episodes
+			.Where(x => x.Season == thisVideo.Episode?.Season)
+			.Select(x => new OtherEpisode
+			{
+				VideoId = x.Videos.First().Id,
+				EpisodeId = x.Id,
+				LibraryId = x.ParentContent.LibraryId,
+				SeasonNum = x.Season,
+				EpisodeNum = x.Episode,
+				Path = Path.Join(x.ParentContent.Library.Path,
+					x.Videos.First().Id.ToString())
+			})
+			.ToArray() ?? [];
+		foreach (OtherEpisode otherEpisode in seasonEpisodes) otherEpisode.LoadFile();
+		seasonEpisodes = seasonEpisodes.Where(x => x.File != null).ToArray();
+
+		job.ProgressMax = seasonEpisodes.Length;
+		for (int i = 0; i < seasonEpisodes.Length; i++)
+		{
+			OtherEpisode ep = seasonEpisodes[i];
+			OtherEpisode[] otherEpisodes = seasonEpisodes
+				                               .Where(x => x.EpisodeId != ep.EpisodeId)
+				                               .ToArray();
+			job.Message =
+				$"Detecting sections for episode {ep.EpisodeId} (comparing with {otherEpisodes.Length} other videos)";
+			job.Progress = i + 1;
+			await db.SaveChangesAsync(cancellationToken);
+
+			List<SimilarRange> allRanges = db.Videos
+				.Include(x => x.VideoSegments)
+				.FirstOrDefault(x => x.Id == ep.VideoId)?
+				.VideoSegments.Select(x => new SimilarRange
+				{
+					LeftStart = (int)Math.Round(x.StartMilliseconds / 1000f),
+					RightStart = 0,
+					LeftDuration = (int)Math.Round((x.VideoDuration) / 1000f),
+					RightDuration = 0,
+					Duration = (int)Math.Round((x.EndMilliseconds - x.StartMilliseconds) / 1000f),
+					Delta = 0,
+					MergeWithNext = false
+				})
+				.ToList() ?? [];
+			foreach (OtherEpisode other in otherEpisodes)
+			{
+				byte[,] similarity = CompareFiles(ep.File!, other.File!);
+				SimilarRange[] ranges = GetSimilarRanges(similarity, 200, 30);
+				allRanges.AddRange(ranges);
+			}
+			allRanges = MergeRanges(allRanges);
+			
+			db.VideoSegments.RemoveRange(db.VideoSegments.Where(x => x.VideoId == ep.VideoId));
+			db.VideoSegments.AddRange(allRanges.Select(x => new DatabaseVideoSegment
+			{
+				Id = Guid.NewGuid(),
+				VideoId = ep.VideoId,
+				Type = GetSegmentType(x),
+				StartMilliseconds = x.LeftStart * 1000,
+				EndMilliseconds = (x.LeftStart + x.Duration) * 1000,
+				VideoDuration = x.LeftDuration * 1000
+			}));
+		}
+
+		job.Message = "Complete";
+	}
+
+	private static SegmentType GetSegmentType(SimilarRange range)
+	{
+		float startPercentage = range.LeftStart / (float)range.LeftDuration;
+		float endPercentage = (range.LeftStart + range.Duration) / (float)range.LeftDuration;
+
+		return startPercentage switch
+		{
+			< .4f when endPercentage < .4f => SegmentType.Opening,
+			> .75f when endPercentage > .75f => SegmentType.Ending,
+			_ => SegmentType.Intermission
+		};
 	}
 
 	public static byte[,] CompareFiles(FingerprintFile file1, FingerprintFile file2)
@@ -111,7 +168,6 @@ public class DetectIntroSectionsJob : IJob
 				while (true)
 				{
 					continuous++;
-					//Console.WriteLine($"[x={x}, y={y}]Checking x={x + continuous}, y={y + continuous} (continuous={continuous})");
 					try
 					{
 						if (map[x + continuous, y + continuous] < threshold)
@@ -149,8 +205,6 @@ public class DetectIntroSectionsJob : IJob
 				int d = Math.Max(Math.Abs(dx), Math.Abs(dy));
 				if (d <= 10)
 					ranges.LastOrDefault()?.MergeWithNext = true;
-
-				Console.WriteLine();
 
 				lastX = x + continuous;
 				lastY = y + continuous;

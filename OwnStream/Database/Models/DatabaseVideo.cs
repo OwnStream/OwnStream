@@ -14,4 +14,5 @@ public class DatabaseVideo
 	public int Length { get; set; }
 	public string Language { get; set; }
 	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
+	public ICollection<DatabaseVideoSegment> VideoSegments { get; } = new List<DatabaseVideoSegment>();
 }

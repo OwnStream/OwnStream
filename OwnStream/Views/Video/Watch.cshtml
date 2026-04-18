@@ -122,11 +122,11 @@ else
 			},
 			hlsManifest: "/Media/@Model.Id/master.m3u8",
 			segments: sections.map(x => ({
-				from: (x.leftStart / x.leftDuration) * 100,
-				to: ((x.leftStart + x.duration) / x.leftDuration) * 100,
+				from: (x.startMilliseconds / x.videoDuration) * 100,
+				to: ((x.endMilliseconds) / x.videoDuration) * 100,
 				color: "#00F",
 				onEnter: function (player) {
-					player.showSkipButton("Skip intro", x.leftStart + x.duration);
+					player.showSkipButton("Skip intro", x.endMilliseconds / 1000);
 				},
 				onExit: function (player) {
 					player.hideSkipButton();
