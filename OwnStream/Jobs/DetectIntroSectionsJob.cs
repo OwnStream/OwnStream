@@ -120,6 +120,122 @@ public class DetectIntroSectionsJob : IJob
 		job.Message = "Complete";
 	}
 
+	private async Task GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
+		CancellationToken cancellationToken)
+	{
+		Conversion conv = new();
+		IMediaInfo hlsInfo = await FFmpeg.GetMediaInfo(job.InputPath, cancellationToken);
+		DirectoryInfo tmpDir = Directory.CreateTempSubdirectory("os_fingerprint_");
+
+		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
+		conv.AddParameter("-an", ParameterPosition.PreInput);
+		conv.AddParameter("-dn", ParameterPosition.PreInput);
+		conv.AddParameter("-sn", ParameterPosition.PreInput);
+		conv.AddStream(hlsInfo.VideoStreams.MaxBy(x => x.Width));
+		conv.AddParameter("-vf scale=128x128,fps=1");
+		conv.SetOutput(tmpDir.FullName + "/%07d.png");
+
+		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
+		job.Message = "Extracting frames...";
+		conv.OnProgress += async (_, eventArgs) =>
+		{
+			DateTimeOffset now = DateTimeOffset.UtcNow;
+			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
+			lastProgressUpdate = now;
+			job.Progress = eventArgs.Percent;
+			job.ProgressMax = 100;
+			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
+			await db.SaveChangesAsync(cancellationToken);
+		};
+		await conv.Start(cancellationToken);
+		job.Progress = 100;
+		job.Message = "Calculating fingerprints...";
+		await db.SaveChangesAsync(cancellationToken);
+
+		IImageHash hashAlgo = new AverageHash();
+		string[] files = tmpDir.GetFiles().Select(x => x.FullName).ToArray();
+
+		ulong[] fingerprints = new ulong[files.Length];
+		job.ProgressMax = files.Length;
+		job.Status = DatabaseFfmpegJob.JobStatus.Processing;
+		for (int i = 0; i < files.Length; i++)
+		{
+			job.Progress = i + 1;
+			await db.SaveChangesAsync(cancellationToken);
+			string f = files[i];
+			int index = int.Parse(Path.GetFileNameWithoutExtension(f)) - 1;
+			await using FileStream fs = File.Open(f, FileMode.Open, FileAccess.Read);
+			fingerprints[index] = hashAlgo.Hash(fs);
+			fs.Close();
+			File.Delete(f);
+		}
+
+		job.Message = "Saving fingerprints...";
+		await db.SaveChangesAsync(cancellationToken);
+
+		FingerprintFile file = new()
+		{
+			Version = 1,
+			// We don't have settings yet, just leave like this for now
+			HashSettings = [0xDE, 0xAD, 0xBE, 0xEF],
+			FrameCount = (uint)fingerprints.Length,
+			Fingerprints = fingerprints
+		};
+		await File.WriteAllBytesAsync(outputDir, file.EncodeToBytes(), cancellationToken);
+
+		tmpDir.Delete(true);
+	}
+
+	private static List<SimilarRange> MergeRanges(List<SimilarRange> allRanges)
+	{
+		if (allRanges.Count == 0)
+			return [];
+
+		// Sort by LeftStart
+		List<SimilarRange> sorted = allRanges.OrderBy(x => x.LeftStart).ToList();
+		List<SimilarRange> merged = [];
+
+		SimilarRange current = new()
+		{
+			LeftStart = sorted[0].LeftStart,
+			LeftDuration = sorted[0].LeftDuration,
+			Duration = sorted[0].Duration,
+			RightStart = 0,
+			RightDuration = 0,
+			Delta = 0,
+			MergeWithNext = false
+		};
+
+		for (int i = 1; i < sorted.Count; i++)
+		{
+			SimilarRange next = sorted[i];
+			int currentEnd = current.LeftStart + current.Duration;
+			int nextEnd = next.LeftStart + next.Duration;
+
+			if (next.LeftStart <= currentEnd)
+			{
+				current.Duration = Math.Max(currentEnd, nextEnd) - current.LeftStart;
+			}
+			else
+			{
+				merged.Add(current);
+				current = new SimilarRange
+				{
+					LeftStart = next.LeftStart,
+					LeftDuration = next.LeftDuration,
+					Duration = next.Duration,
+					RightStart = 0,
+					RightDuration = 0,
+					Delta = 0,
+					MergeWithNext = false
+				};
+			}
+		}
+
+		merged.Add(current);
+		return merged;
+	}
+
 	private static SegmentType GetSegmentType(SimilarRange range)
 	{
 		float startPercentage = range.LeftStart / (float)range.LeftDuration;
@@ -133,7 +249,7 @@ public class DetectIntroSectionsJob : IJob
 		};
 	}
 
-	public static byte[,] CompareFiles(FingerprintFile file1, FingerprintFile file2)
+	private static byte[,] CompareFiles(FingerprintFile file1, FingerprintFile file2)
 	{
 		byte[,] map = new byte[file1.FrameCount, file2.FrameCount];
 		for (int x = 0; x < file1.FrameCount; x++)
@@ -142,7 +258,7 @@ public class DetectIntroSectionsJob : IJob
 		return map;
 	}
 
-	public static SimilarRange[] GetSimilarRanges(byte[,] map, byte threshold, int minimumTime)
+	private static SimilarRange[] GetSimilarRanges(byte[,] map, byte threshold, int minimumTime)
 	{
 		List<SimilarRange> ranges = [];
 		int lastX = 0;
@@ -218,83 +334,6 @@ public class DetectIntroSectionsJob : IJob
 		return ranges.ToArray();
 	}
 
-	public class SimilarRange
-	{
-		public int LeftStart { get; set; }
-		public int RightStart { get; set; }
-		public int LeftDuration { get; set; }
-		public int RightDuration { get; set; }
-		public int Duration { get; set; }
-		public int Delta { get; set; }
-		public bool MergeWithNext { get; set; }
-	}
-
-	private async Task GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
-		CancellationToken cancellationToken)
-	{
-		Conversion conv = new();
-		IMediaInfo hlsInfo = await FFmpeg.GetMediaInfo(job.InputPath, cancellationToken);
-		DirectoryInfo tmpDir = Directory.CreateTempSubdirectory("os_fingerprint_");
-
-		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
-		conv.AddParameter("-an", ParameterPosition.PreInput);
-		conv.AddParameter("-dn", ParameterPosition.PreInput);
-		conv.AddParameter("-sn", ParameterPosition.PreInput);
-		conv.AddStream(hlsInfo.VideoStreams.MaxBy(x => x.Width));
-		conv.AddParameter("-vf scale=128x128,fps=1");
-		conv.SetOutput(tmpDir.FullName + "/%07d.png");
-
-		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
-		job.Message = "Extracting frames...";
-		conv.OnProgress += async (_, eventArgs) =>
-		{
-			DateTimeOffset now = DateTimeOffset.UtcNow;
-			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
-			lastProgressUpdate = now;
-			job.Progress = eventArgs.Percent;
-			job.ProgressMax = 100;
-			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-			await db.SaveChangesAsync(cancellationToken);
-		};
-		await conv.Start(cancellationToken);
-		job.Progress = 100;
-		job.Message = "Calculating fingerprints...";
-		await db.SaveChangesAsync(cancellationToken);
-
-		IImageHash hashAlgo = new AverageHash();
-		string[] files = tmpDir.GetFiles().Select(x => x.FullName).ToArray();
-
-		ulong[] fingerprints = new ulong[files.Length];
-		job.ProgressMax = files.Length;
-		job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-		for (int i = 0; i < files.Length; i++)
-		{
-			job.Progress = i + 1;
-			await db.SaveChangesAsync(cancellationToken);
-			string f = files[i];
-			int index = int.Parse(Path.GetFileNameWithoutExtension(f)) - 1;
-			await using FileStream fs = File.Open(f, FileMode.Open, FileAccess.Read);
-			fingerprints[index] = hashAlgo.Hash(fs);
-			fs.Close();
-			File.Delete(f);
-		}
-
-		job.Message = "Saving fingerprints...";
-		await db.SaveChangesAsync(cancellationToken);
-
-		FingerprintFile file = new()
-		{
-			Version = 1,
-			// We don't have settings yet, just leave like this for now
-			HashSettings = [0xDE, 0xAD, 0xBE, 0xEF],
-			FrameCount = (uint)fingerprints.Length,
-			Fingerprints = fingerprints
-		};
-		await File.WriteAllBytesAsync(outputDir, file.EncodeToBytes(), cancellationToken);
-
-		tmpDir.Delete(true);
-	}
-
 	public class Arguments
 	{
 		public Guid VideoId { get; set; }
@@ -347,7 +386,7 @@ public class DetectIntroSectionsJob : IJob
 		}
 	}
 
-	public class OtherEpisode
+	private class OtherEpisode
 	{
 		public Guid VideoId { get; set; }
 		public Guid EpisodeId { get; set; }
@@ -372,53 +411,14 @@ public class DetectIntroSectionsJob : IJob
 		}
 	}
 
-	public static List<SimilarRange> MergeRanges(List<SimilarRange> allRanges)
+	private class SimilarRange
 	{
-		if (allRanges.Count == 0)
-			return [];
-
-		// Sort by LeftStart
-		List<SimilarRange> sorted = allRanges.OrderBy(x => x.LeftStart).ToList();
-		List<SimilarRange> merged = [];
-
-		SimilarRange current = new()
-		{
-			LeftStart = sorted[0].LeftStart,
-			LeftDuration = sorted[0].LeftDuration,
-			Duration = sorted[0].Duration,
-			RightStart = 0,
-			RightDuration = 0,
-			Delta = 0,
-			MergeWithNext = false
-		};
-
-		for (int i = 1; i < sorted.Count; i++)
-		{
-			SimilarRange next = sorted[i];
-			int currentEnd = current.LeftStart + current.Duration;
-			int nextEnd = next.LeftStart + next.Duration;
-
-			if (next.LeftStart <= currentEnd)
-			{
-				current.Duration = Math.Max(currentEnd, nextEnd) - current.LeftStart;
-			}
-			else
-			{
-				merged.Add(current);
-				current = new SimilarRange
-				{
-					LeftStart = next.LeftStart,
-					LeftDuration = next.LeftDuration,
-					Duration = next.Duration,
-					RightStart = 0,
-					RightDuration = 0,
-					Delta = 0,
-					MergeWithNext = false
-				};
-			}
-		}
-
-		merged.Add(current);
-		return merged;
+		public int LeftStart { get; set; }
+		public int RightStart { get; set; }
+		public int LeftDuration { get; set; }
+		public int RightDuration { get; set; }
+		public int Duration { get; set; }
+		public int Delta { get; set; }
+		public bool MergeWithNext { get; set; }
 	}
 }
