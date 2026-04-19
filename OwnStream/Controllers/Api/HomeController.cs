@@ -23,6 +23,7 @@ public class HomeController(DatabaseContext db) : Controller
 			.Include(x => x.Content)
 			.ThenInclude(x => x!.Episodes)
 			.Where(x => x.UserId == userId)
+			.OrderByDescending(x => x.UpdatedAt)
 			.ToArray();
 		List<Shelf> shelves =
 		[
