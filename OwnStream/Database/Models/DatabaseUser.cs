@@ -41,6 +41,8 @@ public enum UserPermissions
 	WriteVideos = 1 << 6,
 	ReadAllUsers = 1 << 7,
 	WriteUsers = 1 << 8,
+	ReadSettings = 1 << 9,
+	WriteSettings = 1 << 10,
 
 	Admin = 0b1111111111111111,
 	Owner = 0b11111111111111111
