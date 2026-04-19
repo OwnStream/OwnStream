@@ -132,7 +132,7 @@ public class HomeController(DatabaseContext db) : Controller
 					.Include(x => x.Videos)
 					.Include(x => x.WatchProgresses)
 					.Where(x => x.UpdatedAt < cutoff)
-					.Where(x => !x.WatchProgresses.Any(progress => progress.FullyWatched))
+					.Where(x => !x.WatchProgresses.Any(progress => progress.UserId == userId && progress.FullyWatched))
 					.OrderByDescending(x => x.UpdatedAt)
 					.Take(50)
 					.ToArray()
@@ -174,7 +174,7 @@ public class HomeController(DatabaseContext db) : Controller
 							DatabaseContent.ContentType.Movie => x.ParentContent.Poster,
 							_ => x.Thumbnail
 						},
-						WatchProgress = x.WatchProgresses.FirstOrDefault(y => !y.FullyWatched)?.WatchPercentage
+						WatchProgress = x.WatchProgresses.FirstOrDefault(y => !y.FullyWatched && y.UserId == userId)?.WatchPercentage
 					})
 			},
 
