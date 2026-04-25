@@ -6,6 +6,7 @@ using JWT.Algorithms;
 using JWT.Serializers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
@@ -27,10 +28,15 @@ public class JwtAuth(IOptionsMonitor<JwtAuth.SchemeOptions> options, ILoggerFact
 	protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
 	{
 		string header = Context.Request.Headers.Authorization.FirstOrDefault() ?? "";
-		if (!header.StartsWith("Bearer ", StringComparison.InvariantCultureIgnoreCase))
-			return AuthenticateResult.NoResult();
+		string? token = null;
 
-		string token = header["Bearer ".Length..];
+		if (header.StartsWith("Bearer ", StringComparison.InvariantCultureIgnoreCase))
+			token = header["Bearer ".Length..];
+		else if (Context.Request.Query.TryGetValue("access_token", out StringValues queryToken))
+			token = queryToken.FirstOrDefault();
+
+		if (string.IsNullOrEmpty(token))
+			return AuthenticateResult.NoResult();
 		try
 		{
 			JsonObject jwt = Decoder.DecodeToObject<JsonObject>(token, Options.JwtKey);
