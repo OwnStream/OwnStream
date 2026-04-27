@@ -8,7 +8,6 @@ public class User(DatabaseUser user)
 	public string Username { get; set; } = user.Username;
 
 	public string[] Permissions { get; set; } = user.Permissions != UserPermissions.None
-		? user.Permissions.ToString()
-			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+		? Utils.GetAllPermissionsAsStringArray(user.Permissions)
 		: [];
 }

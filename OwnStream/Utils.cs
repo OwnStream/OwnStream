@@ -1,6 +1,7 @@
 using System.Text;
 using Konscious.Security.Cryptography;
 using Microsoft.Extensions.Primitives;
+using OwnStream.Database.Models;
 
 namespace OwnStream;
 
@@ -75,5 +76,14 @@ public static class Utils
 
 			return original;
 		}
+	}
+
+	public static string[] GetAllPermissionsAsStringArray(UserPermissions userPermissions)
+	{
+		return (from permission in Enum.GetValues<UserPermissions>()
+				where permission != UserPermissions.None
+				where userPermissions.HasFlag(permission)
+				select permission.ToString()
+			).ToArray();
 	}
 }
