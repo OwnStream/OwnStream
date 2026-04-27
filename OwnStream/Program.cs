@@ -93,7 +93,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors();
+app.UseCors("Api");
 app.UseAuthentication();
 app.UseAuthorization();
 

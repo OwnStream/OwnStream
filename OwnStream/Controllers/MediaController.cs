@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Response;
@@ -6,10 +7,12 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers;
 
+[EnableCors("Api")]
 public class MediaController(DatabaseContext db) : Controller
 {
 	[Route("/Media/{id:guid}/{file}")]
 	[Route("/Media/{id:guid}/{folder}/{file}")]
+	[EnableCors("Api")]
 	public IActionResult File(Guid id, string? folder, string file)
 	{
 		DatabaseVideo? video = db.Videos.Include(x => x.Library)
@@ -30,6 +33,7 @@ public class MediaController(DatabaseContext db) : Controller
 	}
 
 	[Route("/Media/{id:guid}/subtitles.json")]
+	[EnableCors("Api")]
 	public IActionResult Subtitles(Guid id)
 	{
 		DatabaseVideo? video = db.Videos.Include(x => x.Library)
@@ -61,6 +65,7 @@ public class MediaController(DatabaseContext db) : Controller
 	}
 
 	[Route("/Media/{id:guid}/segments.json")]
+	[EnableCors("Api")]
 	public IActionResult Segments(Guid id)
 	{
 		DatabaseVideo? video = db.Videos.Find(id);
