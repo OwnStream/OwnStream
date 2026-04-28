@@ -25,12 +25,15 @@ public class VideoController(DatabaseContext db) : Controller
 			return null;
 		}
 
-		DatabaseEpisode? ep = db.Episode.IgnoreAutoIncludes().FirstOrDefault(x => x.Id == video.EpisodeId);
+		DatabaseEpisode? ep = db.Episode
+			.Include(x => x.ParentContent)
+			.FirstOrDefault(x => x.Id == video.EpisodeId);
 		return new Video(video)
 		{
 			Subtitles = GetSubtitles(video),
 			PreviewFiles = GetPreviewFiles(video),
-			Episode = ep != null ? new Episode(ep) : null,
+			Episode = ep != null ? new Episode(ep, HttpContext) : null,
+			Content = ep?.ParentContent != null ? new Content(ep.ParentContent, HttpContext) : null,
 			Segments = video.VideoSegments.Select(x => new VideoSegment(x))
 		};
 	}
