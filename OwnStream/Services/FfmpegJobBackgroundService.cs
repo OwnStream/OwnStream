@@ -98,7 +98,11 @@ public class FfmpegJobBackgroundService(
 			logger.LogError(ex, "Job {JobId} failed", job.Id);
 
 			job.Status = DatabaseFfmpegJob.JobStatus.Failed;
-			job.Message = ex.Message;
+			job.Message = string.Join('\n', ex.Message
+				.Split('\n')
+				// Remove FFmpeg spam
+				.Where(x => !x.StartsWith("frame="))
+				.Where(x => !x.Contains("Opening") && !x.StartsWith("for reading")));
 			job.CompletedAt = DateTime.UtcNow;
 			await db.SaveChangesAsync(cancellationToken);
 		}
