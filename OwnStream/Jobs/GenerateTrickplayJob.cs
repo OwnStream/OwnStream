@@ -55,7 +55,7 @@ public class GenerateTrickplayJob : IJob
 				.AddParameter(
 					$"-filter_complex \"[0:v]split=2[base1][base2];" +
 					$"[base1]scale=-2:180,fps=1/5[medium];" +
-					$"[base2]scale=-2:27,fps=100/{video.Duration.TotalSeconds.ToFFmpegFormat(2)}[small]\"")
+					$"[base2]scale=-2:27,fps=100/{Math.Floor(video.Duration.TotalSeconds)}[small]\"")
 				.AddParameter($"-map \"[medium]\" \"{Path.Join(tmp.FullName, "trickplay_medium_%d.png")}\"")
 				.AddParameter($"-map \"[small]\" \"{Path.Join(tmp.FullName, "trickplay_small_%d.png")}\"");
 
