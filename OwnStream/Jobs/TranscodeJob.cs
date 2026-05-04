@@ -52,7 +52,8 @@ public class TranscodeJob : IJob
 		string existingPath = Path.Join(library.Path, args.VideoId.ToString());
 		if (Directory.Exists(existingPath)) Directory.Delete(existingPath, recursive: true);
 
-		Directory.CreateDirectory(job.OutputPath);
+		DirectoryInfo tmpDir = Directory.CreateTempSubdirectory("os_transcode_");
+		DirectoryInfo tmpFingerprintsDir = Directory.CreateTempSubdirectory("os_fingerprint_");
 		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
 		IVideoStream video = media.VideoStreams.First();
 		Dictionary<int, string> videoStreams = [];
@@ -136,8 +137,7 @@ public class TranscodeJob : IJob
 		}
 
 		// Preview & Intro Fingerprint generation
-		Directory.CreateDirectory(Path.Join(job.OutputPath, "imageSequences"));
-		Directory.CreateDirectory(Path.Join(job.OutputPath, "fingerprintRaw"));
+		Directory.CreateDirectory(Path.Join(tmpDir.FullName, "imageSequences"));
 		List<string> complexFilter =
 		[
 			"[0:v]null[vnull]", // if this isnt here, previewmedium doesnt work correctly
@@ -146,12 +146,12 @@ public class TranscodeJob : IJob
 			"[0:v]fps=1,scale=128x128[fingerprint]",
 		];
 		conv.AddParameter($"-filter_complex \"{string.Join(';', complexFilter)}\"");
-		conv.AddParameter($"-map \"[vnull]\" \"{Path.Join(job.OutputPath, "vnull.mp4")}\"");
+		conv.AddParameter($"-map \"[vnull]\" \"{Path.Join(tmpDir.FullName, "vnull.mp4")}\"");
 		conv.AddParameter(
-			$"-map \"[previewmedium]\" \"{Path.Join(job.OutputPath, "imageSequences", "preview_medium_%03d.png")}\"");
+			$"-map \"[previewmedium]\" \"{Path.Join(tmpDir.FullName, "imageSequences", "preview_medium_%03d.png")}\"");
 		conv.AddParameter(
-			$"-map \"[previewsmall]\" \"{Path.Join(job.OutputPath, "imageSequences", "preview_small_%d.png")}\"");
-		conv.AddParameter($"-map \"[fingerprint]\" \"{Path.Join(job.OutputPath, "fingerprintRaw", "%07d.png")}\"");
+			$"-map \"[previewsmall]\" \"{Path.Join(tmpDir.FullName, "imageSequences", "preview_small_%d.png")}\"");
+		conv.AddParameter($"-map \"[fingerprint]\" \"{Path.Join(tmpFingerprintsDir.FullName, "%07d.png")}\"");
 
 		conv.AddParameter("-var_stream_map \"" + streamMap.ToString().TrimEnd(' ') + '"');
 		conv.AddParameter("-f hls");
@@ -164,9 +164,9 @@ public class TranscodeJob : IJob
 		conv.AddParameter("-hls_flags independent_segments");
 		conv.AddParameter("-hls_playlist_type vod");
 		conv.AddParameter("-hls_segment_type fmp4");
-		conv.AddParameter("-hls_segment_filename " + job.OutputPath + "/%v/%05d.m4s");
+		conv.AddParameter($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, "%v", "%05d.m4s")}\"");
 		conv.AddParameter("-master_pl_name master.m3u8");
-		conv.SetOutput(job.OutputPath + "/%v/index.m3u8");
+		conv.AddParameter($"\"{Path.Join(tmpDir.FullName, "%v", "master.m3u8")}\"");
 
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
@@ -187,9 +187,9 @@ public class TranscodeJob : IJob
 		job.Message = "Putting the image files in the correct places";
 		await db.SaveChangesAsync(cancellationToken);
 
-		File.Delete(Path.Join(job.OutputPath, "vnull.mp4"));
-		string imagesDir = Path.Join(job.OutputPath, "imageSequences");
-		string previewsDir = Path.Join(job.OutputPath, "trickplay");
+		File.Delete(Path.Join(tmpDir.FullName, "vnull.mp4"));
+		string imagesDir = Path.Join(tmpDir.FullName, "imageSequences");
+		string previewsDir = Path.Join(tmpDir.FullName, "trickplay");
 		Directory.CreateDirectory(previewsDir);
 		string[] imageFiles = Directory.GetFiles(imagesDir);
 		foreach (string name in imageFiles)
@@ -252,6 +252,28 @@ public class TranscodeJob : IJob
 			}
 		}
 
+		job.ProgressMax = null;
+		job.Message = "Moving the video file to the library";
+		await db.SaveChangesAsync(cancellationToken);
+		List<FileInfo> fileList = [];
+		fileList.AddRange(tmpDir.GetDirectories().SelectMany(x => x.GetFiles()));
+		fileList.AddRange(tmpDir.GetFiles());
+		Directory.CreateDirectory(job.OutputPath);
+		job.ProgressMax = fileList.Count;
+		for (int i = 0; i < fileList.Count; i++)
+		{
+			FileInfo fileInfo = fileList[i];
+			string targetPath = fileInfo.FullName.Replace(tmpDir.FullName, job.OutputPath);
+			string? dir = Path.GetDirectoryName(targetPath);
+			if (dir != null && !Directory.Exists(dir))
+				Directory.CreateDirectory(dir);
+			fileInfo.MoveTo(targetPath);
+			job.Progress = i + 1;
+			await db.SaveChangesAsync(cancellationToken);
+		}
+		job.Message = "Verifying video...";
+		await db.SaveChangesAsync(cancellationToken);
+
 		IMediaInfo info = await FFmpeg.GetMediaInfo(Path.Join(job.OutputPath, "master.m3u8"), cancellationToken);
 		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width)!;
 		string lang = string.Join(",", media.AudioStreams.Select(x => x.Language));
@@ -313,7 +335,7 @@ public class TranscodeJob : IJob
 		{
 			Id = Guid.NewGuid(),
 			JobType = "DetectIntroSections",
-			InputPath = Path.Join(job.OutputPath, "fingerprintRaw"),
+			InputPath = tmpFingerprintsDir.FullName,
 			OutputPath = job.OutputPath,
 			Arguments = JsonSerializer.Serialize(new DetectIntroSectionsJob.Arguments
 			{
