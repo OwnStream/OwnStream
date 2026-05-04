@@ -32,7 +32,7 @@ public class TranscodeJob : IJob
 		Conversion conv = new();
 		Arguments? args = JsonSerializer.Deserialize<Arguments>(job.Arguments);
 		if (args == null) throw new Exception("Invalid arguments");
-		
+
 		if (!config.Transcode.IsValid()) throw new Exception("Invalid transcoding configuration");
 
 		job.Message = "Checking for existing video...";
@@ -103,7 +103,7 @@ public class TranscodeJob : IJob
 		foreach (IAudioStream audio in media.AudioStreams)
 		{
 			if (config.Transcode.AudioLanguages.Count > 0 &&
-			    !config.Transcode.AudioLanguages.Contains(audio.Language) && 
+			    !config.Transcode.AudioLanguages.Contains(audio.Language) &&
 			    audio.Language != "und") continue;
 			foreach (TranscodeConfiguration.AudioPreset res in config.Transcode.AudioPresets)
 			{
@@ -135,6 +135,24 @@ public class TranscodeJob : IJob
 			streamMap.Append(' ');
 		}
 
+		// Preview & Intro Fingerprint generation
+		Directory.CreateDirectory(Path.Join(job.OutputPath, "imageSequences"));
+		Directory.CreateDirectory(Path.Join(job.OutputPath, "fingerprintRaw"));
+		List<string> complexFilter =
+		[
+			"[0:v]null[vnull]", // if this isnt here, previewmedium doesnt work correctly
+			"[0:v]fps=1/5,scale=-2:180,tile=5x5[previewmedium]",
+			$"[0:v]fps=100/{Math.Floor(video.Duration.TotalSeconds)},scale=-2:27,tile=10x10[previewsmall]",
+			"[0:v]fps=1,scale=128x128[fingerprint]",
+		];
+		conv.AddParameter($"-filter_complex \"{string.Join(';', complexFilter)}\"");
+		conv.AddParameter($"-map \"[vnull]\" \"{Path.Join(job.OutputPath, "vnull.mp4")}\"");
+		conv.AddParameter(
+			$"-map \"[previewmedium]\" \"{Path.Join(job.OutputPath, "imageSequences", "preview_medium_%03d.png")}\"");
+		conv.AddParameter(
+			$"-map \"[previewsmall]\" \"{Path.Join(job.OutputPath, "imageSequences", "preview_small_%d.png")}\"");
+		conv.AddParameter($"-map \"[fingerprint]\" \"{Path.Join(job.OutputPath, "fingerprintRaw", "%07d.png")}\"");
+
 		conv.AddParameter("-var_stream_map \"" + streamMap.ToString().TrimEnd(' ') + '"');
 		conv.AddParameter("-f hls");
 		conv.AddParameter("-hls_list_size 0");
@@ -149,10 +167,10 @@ public class TranscodeJob : IJob
 		conv.AddParameter("-hls_segment_filename " + job.OutputPath + "/%v/%05d.m4s");
 		conv.AddParameter("-master_pl_name master.m3u8");
 		conv.SetOutput(job.OutputPath + "/%v/index.m3u8");
-		Console.WriteLine(conv.Build());
 
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
+		await db.SaveChangesAsync(cancellationToken);
 		conv.OnProgress += async (_, eventArgs) =>
 		{
 			DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -164,6 +182,30 @@ public class TranscodeJob : IJob
 			await db.SaveChangesAsync(cancellationToken);
 		};
 		await conv.Start(cancellationToken);
+
+		job.ProgressMax = null;
+		job.Message = "Putting the image files in the correct places";
+		await db.SaveChangesAsync(cancellationToken);
+
+		File.Delete(Path.Join(job.OutputPath, "vnull.mp4"));
+		string imagesDir = Path.Join(job.OutputPath, "imageSequences");
+		string previewsDir = Path.Join(job.OutputPath, "trickplay");
+		Directory.CreateDirectory(previewsDir);
+		string[] imageFiles = Directory.GetFiles(imagesDir);
+		foreach (string name in imageFiles)
+		{
+			FileInfo f = new(name);
+			if (f.Name.StartsWith("preview_small_"))
+			{
+				f.MoveTo(Path.Join(previewsDir, "small.png"));
+			}
+			else if (f.Name.StartsWith("preview_medium_"))
+			{
+				int index = int.Parse(f.Name.Split('.')[0].Split('_')[^1]);
+				f.MoveTo(Path.Join(previewsDir, $"medium_{index}.png"));
+			}
+		}
+		Directory.Delete(imagesDir, true);
 
 		ISubtitleStream[] subtitles = media.SubtitleStreams.ToArray();
 		if (subtitles.Length > 0)
@@ -211,7 +253,7 @@ public class TranscodeJob : IJob
 		}
 
 		IMediaInfo info = await FFmpeg.GetMediaInfo(Path.Join(job.OutputPath, "master.m3u8"), cancellationToken);
-		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width);
+		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width)!;
 		string lang = string.Join(",", media.AudioStreams.Select(x => x.Language));
 		if (lang.Length == 0) lang = "und";
 
@@ -240,26 +282,6 @@ public class TranscodeJob : IJob
 				job.Message = $"Transcoding complete, but failed to delete the input file ({e.Message})";
 			}
 		}
-
-		DatabaseFfmpegJob trickplayJob = new()
-		{
-			Id = Guid.NewGuid(),
-			JobType = "GenerateTrickplay",
-			InputPath = Path.Join(job.OutputPath, "master.m3u8"),
-			OutputPath = job.OutputPath,
-			Arguments = JsonSerializer.Serialize(new GenerateTrickplayJob.Arguments
-			{
-				VideoId = args.VideoId,
-				LibraryId = args.LibraryId
-			}),
-			Status = DatabaseFfmpegJob.JobStatus.Pending,
-			CreatedAt = DateTimeOffset.UtcNow,
-			RelevantVideoId = job.RelevantVideoId,
-			RelevantEpisodeId = job.RelevantEpisodeId,
-			RelevantContentId = job.RelevantContentId,
-			RelevantLibraryId = job.RelevantLibraryId,
-			RelevantWebhookId = job.RelevantWebhookId,
-		};
 
 		DatabaseFfmpegJob metadataJob = new()
 		{
@@ -291,7 +313,7 @@ public class TranscodeJob : IJob
 		{
 			Id = Guid.NewGuid(),
 			JobType = "DetectIntroSections",
-			InputPath = Path.Join(job.OutputPath, "master.m3u8"),
+			InputPath = Path.Join(job.OutputPath, "fingerprintRaw"),
 			OutputPath = job.OutputPath,
 			Arguments = JsonSerializer.Serialize(new DetectIntroSectionsJob.Arguments
 			{
@@ -305,8 +327,7 @@ public class TranscodeJob : IJob
 			RelevantLibraryId = job.RelevantLibraryId,
 			RelevantWebhookId = job.RelevantWebhookId,
 		};
-		db.Add(fingerprintsJob);
-		db.FfmpegJobs.AddRange(metadataJob, fingerprintsJob, trickplayJob);
+		db.FfmpegJobs.AddRange(metadataJob, fingerprintsJob);
 		await db.SaveChangesAsync(cancellationToken);
 	}
 

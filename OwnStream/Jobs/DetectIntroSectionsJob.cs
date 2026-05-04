@@ -31,7 +31,7 @@ public class DetectIntroSectionsJob : IJob
 		await db.SaveChangesAsync(cancellationToken);
 
 		string fingerprintsPath = Path.Join(job.OutputPath, FingerprintsFileName);
-		if (!File.Exists(fingerprintsPath)) 
+		if (!File.Exists(fingerprintsPath))
 			await GenerateFingerprints(job, fingerprintsPath, cancellationToken);
 
 		job.Message = "Loading other episodes...";
@@ -48,7 +48,7 @@ public class DetectIntroSectionsJob : IJob
 			.FirstOrDefault(x => x.Id == args.VideoId);
 
 		if (thisVideo == null) throw new Exception("Video not in the database?");
-		
+
 		// Fill in relevant fields for the job if they're null
 		job.RelevantVideoId ??= args.VideoId;
 		job.RelevantEpisodeId ??= thisVideo.EpisodeId;
@@ -76,8 +76,8 @@ public class DetectIntroSectionsJob : IJob
 		{
 			OtherEpisode ep = seasonEpisodes[i];
 			OtherEpisode[] otherEpisodes = seasonEpisodes
-				                               .Where(x => x.EpisodeId != ep.EpisodeId)
-				                               .ToArray();
+				.Where(x => x.EpisodeId != ep.EpisodeId)
+				.ToArray();
 			job.Message =
 				$"Detecting sections for episode {ep.EpisodeId} (comparing with {otherEpisodes.Length} other videos)";
 			job.Progress = i + 1;
@@ -103,8 +103,9 @@ public class DetectIntroSectionsJob : IJob
 				SimilarRange[] ranges = GetSimilarRanges(similarity, 200, 30);
 				allRanges.AddRange(ranges);
 			}
+
 			allRanges = MergeRanges(allRanges);
-			
+
 			db.VideoSegments.RemoveRange(db.VideoSegments.Where(x => x.VideoId == ep.VideoId));
 			db.VideoSegments.AddRange(allRanges.Select(x => new DatabaseVideoSegment
 			{
@@ -123,37 +124,11 @@ public class DetectIntroSectionsJob : IJob
 	private async Task GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
 		CancellationToken cancellationToken)
 	{
-		Conversion conv = new();
-		IMediaInfo hlsInfo = await FFmpeg.GetMediaInfo(job.InputPath, cancellationToken);
-		DirectoryInfo tmpDir = Directory.CreateTempSubdirectory("os_fingerprint_");
-
-		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
-		conv.AddParameter("-an", ParameterPosition.PreInput);
-		conv.AddParameter("-dn", ParameterPosition.PreInput);
-		conv.AddParameter("-sn", ParameterPosition.PreInput);
-		conv.AddStream(hlsInfo.VideoStreams.MaxBy(x => x.Width));
-		conv.AddParameter("-vf scale=128x128,fps=1");
-		conv.SetOutput(tmpDir.FullName + "/%07d.png");
-
-		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
-		job.Message = "Extracting frames...";
-		conv.OnProgress += async (_, eventArgs) =>
-		{
-			DateTimeOffset now = DateTimeOffset.UtcNow;
-			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
-			lastProgressUpdate = now;
-			job.Progress = eventArgs.Percent;
-			job.ProgressMax = 100;
-			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-			await db.SaveChangesAsync(cancellationToken);
-		};
-		await conv.Start(cancellationToken);
-		job.Progress = 100;
 		job.Message = "Calculating fingerprints...";
 		await db.SaveChangesAsync(cancellationToken);
 
 		IImageHash hashAlgo = new AverageHash();
-		string[] files = tmpDir.GetFiles().Select(x => x.FullName).ToArray();
+		string[] files = Directory.GetFiles(job.InputPath);
 
 		ulong[] fingerprints = new ulong[files.Length];
 		job.ProgressMax = files.Length;
@@ -183,7 +158,7 @@ public class DetectIntroSectionsJob : IJob
 		};
 		await File.WriteAllBytesAsync(outputDir, file.EncodeToBytes(), cancellationToken);
 
-		tmpDir.Delete(true);
+		Directory.Delete(job.InputPath, true);
 	}
 
 	private static List<SimilarRange> MergeRanges(List<SimilarRange> allRanges)
