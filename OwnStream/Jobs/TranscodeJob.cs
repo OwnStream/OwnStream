@@ -171,6 +171,7 @@ public class TranscodeJob : IJob
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
+		// TODO: Broken. Watch the fingerprints folder, and get the progress through there, since those files are created as FFmpeg goes on.
 		conv.OnProgress += async (_, eventArgs) =>
 		{
 			DateTimeOffset now = DateTimeOffset.UtcNow;
