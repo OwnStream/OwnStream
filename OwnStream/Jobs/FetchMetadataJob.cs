@@ -36,6 +36,14 @@ public class FetchMetadataJob : IJob
 			_ => throw new IndexOutOfRangeException($"Unexpected metadata type '{args.Type}'")
 		};
 
+		job.Message = updatedItems.Content.Type switch
+		{
+			DatabaseContent.ContentType.Movie => $"Got metadata for movie '{updatedItems.Content.Title}'",
+			DatabaseContent.ContentType.Tv =>
+				$"Got metadata for '{updatedItems.Content.Title}' S{updatedItems.Episode?.Season} E{updatedItems.Episode?.Episode}: {updatedItems.Episode?.Title}",
+			_ => job.Message
+		};
+
 		// Fill in relevant fields for the job if they're null
 		job.RelevantVideoId ??= args.VideoId;
 		job.RelevantContentId ??= updatedItems.Content.Id;
@@ -51,7 +59,8 @@ public class FetchMetadataJob : IJob
 		await tmdb.GetConfigAsync();
 	}
 
-	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchMovieMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
+	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchMovieMetadata(DatabaseFfmpegJob job,
+		Arguments args, CancellationToken cancellationToken)
 	{
 		Movie? tmdbMovie = null;
 		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
@@ -114,7 +123,8 @@ public class FetchMetadataJob : IJob
 		return (content, episode);
 	}
 
-	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchShowMetadata(DatabaseFfmpegJob job, Arguments args, CancellationToken cancellationToken)
+	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchShowMetadata(DatabaseFfmpegJob job,
+		Arguments args, CancellationToken cancellationToken)
 	{
 		TvShow? tmdbShow = null;
 		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
@@ -122,7 +132,8 @@ public class FetchMetadataJob : IJob
 				TvShowMethods.Translations | TvShowMethods.Images | TvShowMethods.ContentRatings,
 				cancellationToken: cancellationToken);
 
-		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId, cancellationToken);
+		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId,
+			cancellationToken);
 		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId)) content.ImdbId = pImdbId;
 		if (args.ProviderIds.TryGetValue("tmdb", out string? pTmdbId) && int.TryParse(pTmdbId, out int iTmdbId))
 			content.TmdbId = iTmdbId;
@@ -160,7 +171,8 @@ public class FetchMetadataJob : IJob
 
 		content.ReleasedAt = new DateTimeOffset(tmdbShow?.FirstAirDate ?? DateTime.UnixEpoch).ToUniversalTime();
 		content.FinishedStreamingAt = tmdbShow?.LastAirDate != null
-			? new DateTimeOffset(tmdbShow.LastAirDate.Value).ToUniversalTime() : null;
+			? new DateTimeOffset(tmdbShow.LastAirDate.Value).ToUniversalTime()
+			: null;
 		content.UpdatedAt = DateTimeOffset.UtcNow;
 		foreach (ContentRating rating in tmdbShow?.ContentRatings?.Results ?? [])
 		{
@@ -172,13 +184,13 @@ public class FetchMetadataJob : IJob
 		if (args is { Episode: not null, Season: not null })
 		{
 			episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
-			
+
 			TvEpisode? tmdbEpisode = null;
 			if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbEId) && int.TryParse(sTmdbEId, out int tmdbIdE))
 				tmdbEpisode = await tmdb.GetTvEpisodeAsync(tmdbIdE, args.Season.Value, args.Episode.Value,
 					TvEpisodeMethods.Translations | TvEpisodeMethods.Images,
 					cancellationToken: cancellationToken);
-			
+
 			episode.Title = tmdbEpisode?.Name ?? $"Episode {args.Episode}";
 			episode.Summary = tmdbEpisode?.Overview ?? "";
 			episode.UpdatedAt = DateTimeOffset.UtcNow;
@@ -190,7 +202,8 @@ public class FetchMetadataJob : IJob
 
 			foreach (Translation translation in tmdbEpisode?.Translations?.Translations ?? [])
 			{
-				if (translation.Iso_639_1 == null || translation.Iso_3166_1 == null || translation.Data == null) continue;
+				if (translation.Iso_639_1 == null || translation.Iso_3166_1 == null ||
+				    translation.Data == null) continue;
 				string key = translation.Iso_639_1 + "_" + translation.Iso_3166_1;
 				if (translation.Data.Name != null && translation.Data.Name.Trim().Length > 0)
 					episode.TranslatedTitle[key] = translation.Data.Name.Trim();
