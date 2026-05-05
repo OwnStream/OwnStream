@@ -5,6 +5,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.Mapping;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 using Xabe.FFmpeg;
+using Xabe.FFmpeg.Exceptions;
 using Xabe.FFmpeg.Streams.SubtitleStream;
 
 namespace OwnStream.Jobs;
@@ -60,6 +61,31 @@ public class TranscodeJob : IJob
 		Dictionary<int, string> videoStreams = [];
 		Dictionary<int, string> audioStreams = [];
 		conv.AddParameter($"-i \"{job.InputPath}\"");
+
+		// TODO: Make configurable
+		List<string> hlsFlags = [
+			"-f hls",
+			"-hls_list_size 0",
+			"-hls_init_time 10",
+			"-hls_time 10",
+			"-g 48",
+			"-keyint_min 48",
+			"-sc_threshold 0",
+			"-hls_flags independent_segments",
+			"-hls_playlist_type vod",
+			"-hls_segment_type fmp4"
+		];
+
+		// Preview & Intro Fingerprint generation
+		Directory.CreateDirectory(Path.Join(tmpDir.FullName, "imageSequences"));
+		List<string> complexFilter =
+		[
+			"[0:v]fps=1/5,scale=-2:180,tile=5x5[previewmedium]",
+			$"[0:v]fps=100/{Math.Floor(video.Duration.TotalSeconds)},scale=-2:27,tile=10x10[previewsmall]",
+			"[0:v]fps=1,scale=128x128[fingerprint]",
+		];
+		List<string> mapArgs = [];
+
 		foreach (TranscodeConfiguration.VideoPreset res in
 		         config.Transcode.VideoPresets.OrderByDescending(x => x.Width))
 		{
@@ -67,7 +93,10 @@ public class TranscodeJob : IJob
 
 			int videoIndex = videoStreams.Count;
 			if (videoIndex >= config.Transcode.MaxVideoStreams) continue;
+			string key = "v_" + res.Name;
 			string codec = res.Codec;
+			complexFilter.Add($"[0:v]scale={res.Width}:-2[{key}]");
+			mapArgs.Add($"-map \"[{key}]\"");
 			if (video.PixelFormat.EndsWith("10le"))
 			{
 				// 10-bit color isn't always supported on all clients / encoders
@@ -75,10 +104,10 @@ public class TranscodeJob : IJob
 				{
 					case TranscodeConfiguration.PixFmtHandling.DownsampleIfUnsupported:
 						if (res.Codec == "h264_nvenc") // TODO: Add more codecs that can't do 10-bit color
-							conv.AddParameter($"-pix_fmt:v:{videoIndex} {video.PixelFormat.Replace("10le", "")}");
+							mapArgs.Add($"-pix_fmt {video.PixelFormat.Replace("10le", "")}");
 						break;
 					case TranscodeConfiguration.PixFmtHandling.DownsampleAlways:
-						conv.AddParameter($"-pix_fmt:v:{videoIndex} {video.PixelFormat.Replace("10le", "")}");
+						mapArgs.Add($"-pix_fmt {video.PixelFormat.Replace("10le", "")}");
 						break;
 					case TranscodeConfiguration.PixFmtHandling.UseSoftware:
 						int underscore = res.Codec.IndexOf('_');
@@ -93,12 +122,13 @@ public class TranscodeJob : IJob
 						continue;
 				}
 			}
-
-			conv.AddParameter($"-map 0:{video.Index}");
-			conv.AddParameter($"-filter:v:{videoIndex} scale={res.Width}:-2");
-			conv.AddParameter($"-b:v:{videoIndex} {res.Bitrate}");
-			conv.AddParameter($"-c:v:{videoIndex} {codec}");
+			mapArgs.Add($"-b:v {res.Bitrate}");
+			mapArgs.Add($"-c:v {codec}");
+			mapArgs.AddRange(hlsFlags);
+			mapArgs.Add($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, key, "%05d.m4s")}\"");
+			mapArgs.Add($"\"{Path.Join(tmpDir.FullName, key, "index.m3u8")}\"");
 			videoStreams.Add(videoIndex, res.Name);
+			tmpDir.CreateSubdirectory(key);
 		}
 
 		if (videoStreams.Count == 0)
@@ -112,65 +142,32 @@ public class TranscodeJob : IJob
 			foreach (TranscodeConfiguration.AudioPreset res in config.Transcode.AudioPresets)
 			{
 				if (res.Channels > audio.Channels) continue;
+				string key = $"a_{audio.Index}-{audio.Language}-{audio.Title}";
 				int audioIndex = audioStreams.Count;
-				conv.AddParameter($"-map 0:{audio.Index}");
-				conv.AddParameter($"-b:a:{audioIndex} {res.Bitrate}");
-				conv.AddParameter($"-acodec:a:{audioIndex} {res.Codec}");
-				conv.AddParameter($"-ac:a:{audioIndex} {res.Channels}");
-				audioStreams.Add(audioIndex, audio.Language + "-" + audio.Title);
+				complexFilter.Add($"[0:{audio.Index}]anull[{key}]");
+				mapArgs.Add($"-map \"[{key}]\"");
+				mapArgs.Add($"-b:a {res.Bitrate}");
+				mapArgs.Add($"-acodec:a {res.Codec}");
+				mapArgs.Add($"-ac:a:{audioIndex} {res.Channels}");
+				mapArgs.AddRange(hlsFlags);
+				mapArgs.Add($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, key, "%05d.m4s")}\"");
+				mapArgs.Add($"\"{Path.Join(tmpDir.FullName, key, "index.m3u8")}\"");
+				audioStreams.Add(audioIndex, key);
+				tmpDir.CreateSubdirectory(key);
 			}
 		}
 
-		StringBuilder streamMap = new();
-		foreach ((int index, string name) in videoStreams)
-			streamMap.Append("v:").Append(index).Append(",agroup:aud,name:").Append(name).Append(' ');
-		foreach ((int index, string name) in audioStreams)
-		{
-			string[] parts = name.Split('-', 2, StringSplitOptions.TrimEntries);
-			string title = name.Length switch
-			{
-				2 => parts[1],
-				_ => parts[0]
-			};
-			if (title.Length == 0) title = parts[0];
-			streamMap.Append("a:").Append(index).Append(",agroup:aud,language:").Append(parts[0])
-				.Append(",name:").Append($"{index}-{title}");
-			if (index == 0) streamMap.Append(",default:yes");
-			streamMap.Append(' ');
-		}
-
-		// Preview & Intro Fingerprint generation
-		Directory.CreateDirectory(Path.Join(tmpDir.FullName, "imageSequences"));
-		List<string> complexFilter =
-		[
-			"[0:v]null[vnull]", // if this isnt here, previewmedium doesnt work correctly
-			"[0:v]fps=1/5,scale=-2:180,tile=5x5[previewmedium]",
-			$"[0:v]fps=100/{Math.Floor(video.Duration.TotalSeconds)},scale=-2:27,tile=10x10[previewsmall]",
-			"[0:v]fps=1,scale=128x128[fingerprint]",
-		];
 		conv.AddParameter($"-filter_complex \"{string.Join(';', complexFilter)}\"");
-		conv.AddParameter($"-map \"[vnull]\" \"{Path.Join(tmpDir.FullName, "vnull.mp4")}\"");
 		conv.AddParameter(
 			$"-map \"[previewmedium]\" \"{Path.Join(tmpDir.FullName, "imageSequences", "preview_medium_%03d.png")}\"");
 		conv.AddParameter(
 			$"-map \"[previewsmall]\" \"{Path.Join(tmpDir.FullName, "imageSequences", "preview_small_%d.png")}\"");
 		conv.AddParameter($"-map \"[fingerprint]\" \"{Path.Join(tmpFingerprintsDir.FullName, "%07d.png")}\"");
-
-		conv.AddParameter("-var_stream_map \"" + streamMap.ToString().TrimEnd(' ') + '"');
-		conv.AddParameter("-f hls");
-		conv.AddParameter("-hls_list_size 0");
-		conv.AddParameter("-hls_init_time 10");
-		conv.AddParameter("-hls_time 5");
-		conv.AddParameter("-g 48");
-		conv.AddParameter("-keyint_min 48");
-		conv.AddParameter("-sc_threshold 0");
-		conv.AddParameter("-hls_flags independent_segments");
-		conv.AddParameter("-hls_playlist_type vod");
-		conv.AddParameter("-hls_segment_type fmp4");
-		conv.AddParameter($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, "%v", "%05d.m4s")}\"");
-		conv.AddParameter("-master_pl_name master.m3u8");
-		conv.AddParameter($"\"{Path.Join(tmpDir.FullName, "%v", "master.m3u8")}\"");
-
+		foreach (string a in mapArgs)
+		{
+			conv.AddParameter(a);
+		}
+		
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
@@ -186,7 +183,14 @@ public class TranscodeJob : IJob
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
 		};
-		await conv.Start(cancellationToken);
+		try
+		{
+			await conv.Start(cancellationToken);
+		}
+		catch (ConversionException e)
+		{
+			throw new Exception($"Transcode failed.\n$ ffmpeg {conv.Build().Replace(" -", " \\\n\t-")}\n{e.Message}");
+		}
 
 		job.ProgressMax = null;
 		job.Message = "Putting the image files in the correct places";
