@@ -8,7 +8,8 @@ namespace OwnStream.Services;
 public class FfmpegJobBackgroundService(
 	IServiceScopeFactory scopeFactory,
 	ILogger<FfmpegJobBackgroundService> logger,
-	JobManager jobManager) : BackgroundService
+	JobManager jobManager,
+	JobCancellationService jobCancellationService) : BackgroundService
 {
 	private readonly SemaphoreSlim singleJobLock = new(1, 1);
 
@@ -75,6 +76,9 @@ public class FfmpegJobBackgroundService(
 
 		if (job == null) return;
 
+		using CancellationTokenSource cts =
+			CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		jobCancellationService.Register(job.Id, cts);
 		try
 		{
 			logger.LogInformation("Processing job {JobId}", job.Id);
@@ -85,7 +89,7 @@ public class FfmpegJobBackgroundService(
 				throw new Exception($"Unexpected job type '{job.JobType}'");
 
 			ijob.Initialize(scope.ServiceProvider);
-			await ijob.ExecuteJob(job.Id, cancellationToken);
+			await ijob.ExecuteJob(job.Id, cts.Token);
 
 			job.Status = DatabaseFfmpegJob.JobStatus.Completed;
 			if (job.ProgressMax != null && job.Progress != job.ProgressMax)
@@ -105,6 +109,10 @@ public class FfmpegJobBackgroundService(
 				.Where(x => !x.Contains("Opening") && !x.StartsWith("for reading")));
 			job.CompletedAt = DateTime.UtcNow;
 			await db.SaveChangesAsync(cancellationToken);
+		}
+		finally
+		{
+			jobCancellationService.Unregister(job.Id, cts);
 		}
 	}
 }
