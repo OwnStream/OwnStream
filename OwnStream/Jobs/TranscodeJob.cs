@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.Mapping;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 using Xabe.FFmpeg;
@@ -86,11 +87,13 @@ public class TranscodeJob : IJob
 							string hw = res.Codec[underscore..];
 							codec = res.Codec.Replace($"_{hw}", "");
 						}
+
 						break;
 					default:
 						continue;
 				}
 			}
+
 			conv.AddParameter($"-map 0:{video.Index}");
 			conv.AddParameter($"-filter:v:{videoIndex} scale={res.Width}:-2");
 			conv.AddParameter($"-b:v:{videoIndex} {res.Bitrate}");
@@ -171,14 +174,15 @@ public class TranscodeJob : IJob
 		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
-		// TODO: Broken. Watch the fingerprints folder, and get the progress through there, since those files are created as FFmpeg goes on.
-		conv.OnProgress += async (_, eventArgs) =>
+		conv.OnDataReceived += async (_, eventArgs) =>
 		{
 			DateTimeOffset now = DateTimeOffset.UtcNow;
-			if (!((now - lastProgressUpdate).TotalSeconds >= 5)) return;
+			if ((now - lastProgressUpdate).TotalSeconds <= 1) return;
 			lastProgressUpdate = now;
-			job.Progress = eventArgs.Percent;
-			job.ProgressMax = 100;
+
+			job.Message = eventArgs.Data;
+			job.Progress = tmpFingerprintsDir.GetFiles().Length;
+			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
 		};
@@ -206,6 +210,7 @@ public class TranscodeJob : IJob
 				f.MoveTo(Path.Join(previewsDir, $"medium_{index}.png"));
 			}
 		}
+
 		Directory.Delete(imagesDir, true);
 
 		ISubtitleStream[] subtitles = media.SubtitleStreams.ToArray();
@@ -272,6 +277,7 @@ public class TranscodeJob : IJob
 			job.Progress = i + 1;
 			await db.SaveChangesAsync(cancellationToken);
 		}
+
 		job.Message = "Verifying video...";
 		await db.SaveChangesAsync(cancellationToken);
 
