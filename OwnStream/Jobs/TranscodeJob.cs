@@ -1,7 +1,8 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.Mapping;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 using Xabe.FFmpeg;
@@ -58,12 +59,13 @@ public class TranscodeJob : IJob
 		DirectoryInfo tmpFingerprintsDir = Directory.CreateTempSubdirectory("os_fingerprint_");
 		conv.AddParameter("-hide_banner", ParameterPosition.PreInput);
 		IVideoStream video = media.VideoStreams.First();
-		Dictionary<int, string> videoStreams = [];
-		Dictionary<int, string> audioStreams = [];
+		List<EncodedVideo> videoStreams = [];
+		List<EncodedAudio> audioStreams = [];
 		conv.AddParameter($"-i \"{job.InputPath}\"");
 
 		// TODO: Make configurable
-		List<string> hlsFlags = [
+		List<string> hlsFlags =
+		[
 			"-f hls",
 			"-hls_list_size 0",
 			"-hls_init_time 10",
@@ -85,6 +87,7 @@ public class TranscodeJob : IJob
 			"[0:v]fps=1,scale=128x128[fingerprint]",
 		];
 		List<string> mapArgs = [];
+		float videoAspectRatio = (float)video.Width / video.Height;
 
 		foreach (TranscodeConfiguration.VideoPreset res in
 		         config.Transcode.VideoPresets.OrderByDescending(x => x.Width))
@@ -122,12 +125,19 @@ public class TranscodeJob : IJob
 						continue;
 				}
 			}
+
 			mapArgs.Add($"-b:v {res.Bitrate}");
 			mapArgs.Add($"-c:v {codec}");
 			mapArgs.AddRange(hlsFlags);
 			mapArgs.Add($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, key, "%05d.m4s")}\"");
 			mapArgs.Add($"\"{Path.Join(tmpDir.FullName, key, "index.m3u8")}\"");
-			videoStreams.Add(videoIndex, res.Name);
+			videoStreams.Add(new EncodedVideo
+			{
+				Key = key,
+				Bandwidth = res.Bitrate,
+				Resolution = $"{res.Width}x{res.CalculateHeight(videoAspectRatio)}",
+				AudioGroup = "aud"
+			});
 			tmpDir.CreateSubdirectory(key);
 		}
 
@@ -142,7 +152,7 @@ public class TranscodeJob : IJob
 			foreach (TranscodeConfiguration.AudioPreset res in config.Transcode.AudioPresets)
 			{
 				if (res.Channels > audio.Channels) continue;
-				string key = $"a_{audio.Index}-{audio.Language}-{audio.Title}";
+				string key = $"a-{res.Codec}_{res.Bitrate}_{res.Channels}-{audio.Index}-{audio.Language}-{audio.Title}";
 				int audioIndex = audioStreams.Count;
 				complexFilter.Add($"[0:{audio.Index}]anull[{key}]");
 				mapArgs.Add($"-map \"[{key}]\"");
@@ -152,7 +162,16 @@ public class TranscodeJob : IJob
 				mapArgs.AddRange(hlsFlags);
 				mapArgs.Add($"-hls_segment_filename \"{Path.Join(tmpDir.FullName, key, "%05d.m4s")}\"");
 				mapArgs.Add($"\"{Path.Join(tmpDir.FullName, key, "index.m3u8")}\"");
-				audioStreams.Add(audioIndex, key);
+				audioStreams.Add(new EncodedAudio
+				{
+					Key = key,
+					AudioGroup = "aud",
+					// TODO: Get full name from audio.Language
+					Name = !string.IsNullOrWhiteSpace(audio.Title) ? audio.Title.Trim() : audio.Language,
+					Default = audio.Default > 0,
+					Language = audio.Language,
+					Channels = res.Channels
+				});
 				tmpDir.CreateSubdirectory(key);
 			}
 		}
@@ -163,29 +182,25 @@ public class TranscodeJob : IJob
 		conv.AddParameter(
 			$"-map \"[previewsmall]\" \"{Path.Join(tmpDir.FullName, "imageSequences", "preview_small_%d.png")}\"");
 		conv.AddParameter($"-map \"[fingerprint]\" \"{Path.Join(tmpFingerprintsDir.FullName, "%07d.png")}\"");
-		foreach (string a in mapArgs)
-		{
-			conv.AddParameter(a);
-		}
-		
-		DateTimeOffset lastProgressUpdate = DateTimeOffset.MinValue;
+		foreach (string a in mapArgs) conv.AddParameter(a);
+
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
+		bool dbLock = false;
 		conv.OnDataReceived += async (_, eventArgs) =>
 		{
-			DateTimeOffset now = DateTimeOffset.UtcNow;
-			if ((now - lastProgressUpdate).TotalSeconds <= 1) return;
-			lastProgressUpdate = now;
+			if (dbLock) return;
+			dbLock = true;
 
-			if (eventArgs.Data != null)
-			{
-				if (!eventArgs.Data.Contains("Opening") && !eventArgs.Data.Contains("for writing"))
-					job.Message = eventArgs.Data;
-			}
+			if (eventArgs.Data != null && !eventArgs.Data.Contains("Opening") &&
+			    !eventArgs.Data.Contains("for writing"))
+				job.Message = eventArgs.Data;
+
 			job.Progress = tmpFingerprintsDir.GetFiles().Length;
 			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
+			dbLock = false;
 		};
 		try
 		{
@@ -200,7 +215,6 @@ public class TranscodeJob : IJob
 		job.Message = "Putting the image files in the correct places";
 		await db.SaveChangesAsync(cancellationToken);
 
-		File.Delete(Path.Join(tmpDir.FullName, "vnull.mp4"));
 		string imagesDir = Path.Join(tmpDir.FullName, "imageSequences");
 		string previewsDir = Path.Join(tmpDir.FullName, "trickplay");
 		Directory.CreateDirectory(previewsDir);
@@ -245,18 +259,20 @@ public class TranscodeJob : IJob
 					"subrip" => "srt",
 					"ssa" => "ssa",
 					"ass" => "ass",
-					"hdmv_pgs_subtitle" => "pgs",
+					"hdmv_pgs_subtitle" => "sup",
 					_ => throw new IndexOutOfRangeException("Unknown subtitle codec: " + subtitle.Codec)
 				};
 				IConversion subConv = new Conversion()
 					.AddStream(subtitle)
+					.AddParameter("-y")
 					.SetOutput(Path.Join(job.OutputPath, "captions", $"{name}.{extension}"));
 				await subConv.Start(cancellationToken);
 
 				// Try to convert text-based subtitles to WebVTT for web playback
-				if (isBitmap && extension != "vtt") continue;
+				if (isBitmap || extension == "vtt") continue;
 				subConv = new Conversion()
 					.AddStream(subtitle.SetCodec(SubtitleCodec.webvtt))
+					.AddParameter("-y")
 					.SetOutput(Path.Join(job.OutputPath, "captions", $"{name}.vtt"));
 				await subConv.Start(cancellationToken);
 			}
@@ -265,6 +281,46 @@ public class TranscodeJob : IJob
 				// Ignored
 			}
 		}
+
+		job.Message = "Generating the master playlist...";
+		await db.SaveChangesAsync(cancellationToken);
+
+		StringBuilder hls = new();
+		hls.AppendLine("#EXTM3U");
+		hls.AppendLine("#EXT-X-VERSION:7");
+		foreach (EncodedAudio ea in audioStreams)
+		{
+			hls.Append("#EXT-X-MEDIA:TYPE=AUDIO,")
+				.Append($"GROUP-ID=\"{ea.AudioGroup}\",")
+				.Append($"NAME=\"{ea.Name}\",")
+				.Append($"DEFAULT={(ea.Default ? "YES" : "NO")},")
+				.Append($"LANGUAGE=\"{ea.Language}\",")
+				.Append($"CHANNELS=\"{ea.Channels}\",")
+				.AppendLine($"URI=\"{ea.Key}/index.m3u8\"");
+		}
+
+		foreach (EncodedVideo ev in videoStreams)
+		{
+			ProcessStartInfo psi = new("ffprobe",
+				[Path.Join(tmpDir.FullName, ev.Key, "index.m3u8"), "-show_streams", "-print_format", "json"])
+			{
+				RedirectStandardOutput = true
+			};
+			Process p = Process.Start(psi)!;
+			await p.WaitForExitAsync(cancellationToken);
+			string? codec = JsonSerializer.Deserialize<JsonObject>(p.StandardOutput.BaseStream)?
+				["streams"]?[0]?["mime_codec_string"]?.GetValue<string>();
+			hls.AppendLine()
+				.Append("#EXT-X-STREAM-INF:")
+				.Append($"BANDWIDTH={ev.Bandwidth},")
+				.Append($"RESOLUTION={ev.Resolution},");
+			if (codec != null)
+				hls.Append($"CODECS=\"{codec}\",");
+			hls.AppendLine($"AUDIO=\"{ev.AudioGroup}\"");
+			hls.AppendLine(ev.Key + "/index.m3u8");
+		}
+
+		await File.WriteAllTextAsync(Path.Join(tmpDir.FullName, "master.m3u8"), hls.ToString(), cancellationToken);
 
 		job.ProgressMax = null;
 		job.Message = "Moving the video file to the library";
@@ -281,7 +337,7 @@ public class TranscodeJob : IJob
 			string? dir = Path.GetDirectoryName(targetPath);
 			if (dir != null && !Directory.Exists(dir))
 				Directory.CreateDirectory(dir);
-			fileInfo.MoveTo(targetPath);
+			fileInfo.MoveTo(targetPath, true);
 			job.Progress = i + 1;
 			await db.SaveChangesAsync(cancellationToken);
 		}
@@ -374,5 +430,23 @@ public class TranscodeJob : IJob
 		public Dictionary<string, string> Metadata { get; set; }
 		public Guid VideoId { get; set; }
 		public Guid LibraryId { get; set; }
+	}
+
+	private class EncodedVideo
+	{
+		public string Key { get; set; }
+		public int Bandwidth { get; set; }
+		public string Resolution { get; set; }
+		public string AudioGroup { get; set; }
+	}
+
+	private class EncodedAudio
+	{
+		public string Key { get; set; }
+		public string AudioGroup { get; set; }
+		public string Name { get; set; }
+		public bool Default { get; set; }
+		public string Language { get; set; }
+		public int Channels { get; set; }
 	}
 }

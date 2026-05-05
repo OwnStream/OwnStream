@@ -26,6 +26,9 @@ public class TranscodeConfiguration
 		public int Width { get; set; }
 		public int Bitrate { get; set; }
 		public string Codec { get; set; }
+
+		public int CalculateHeight(float videoAspectRatio) =>
+			(int)Math.Round(Width / Math.Round((videoAspectRatio * 2) / 2));
 	}
 
 	public enum PixFmtHandling
