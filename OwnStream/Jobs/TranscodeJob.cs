@@ -177,7 +177,11 @@ public class TranscodeJob : IJob
 			if ((now - lastProgressUpdate).TotalSeconds <= 1) return;
 			lastProgressUpdate = now;
 
-			job.Message = eventArgs.Data;
+			if (eventArgs.Data != null)
+			{
+				if (!eventArgs.Data.Contains("Opening") && !eventArgs.Data.Contains("for writing"))
+					job.Message = eventArgs.Data;
+			}
 			job.Progress = tmpFingerprintsDir.GetFiles().Length;
 			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
