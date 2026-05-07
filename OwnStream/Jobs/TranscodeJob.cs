@@ -192,11 +192,11 @@ public class TranscodeJob : IJob
 			if (dbLock) return;
 			dbLock = true;
 
-			if (eventArgs.Data != null && !eventArgs.Data.Contains("Opening") &&
-			    !eventArgs.Data.Contains("for writing"))
-				job.Message = eventArgs.Data;
+			int secs = tmpFingerprintsDir.GetFiles().Length;
+			double speed = (secs / DateTimeOffset.UtcNow.Subtract(job.StartedAt ?? new DateTimeOffset()).TotalSeconds);
+			job.Message = $"Transcoding at {speed:F2}x speed";
 
-			job.Progress = tmpFingerprintsDir.GetFiles().Length;
+			job.Progress = secs;
 			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
