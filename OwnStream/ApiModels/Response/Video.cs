@@ -13,6 +13,7 @@ public class Video(DatabaseVideo video)
 
 	public SubtitleFile[]? Subtitles { get; set; } = null;
 	public PreviewFile[]? PreviewFiles { get; set; } = null;
+	public string[]? Attachments { get; set; } = null;
 	public Episode? Episode { get; set; } = null;
 	public Content? Content { get; set; }
 	public IEnumerable<VideoSegment> Segments { get; set; }

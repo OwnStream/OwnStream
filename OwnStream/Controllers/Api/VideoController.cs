@@ -32,6 +32,7 @@ public class VideoController(DatabaseContext db) : Controller
 		{
 			Subtitles = GetSubtitles(video),
 			PreviewFiles = GetPreviewFiles(video),
+			Attachments = GetAttachmentFiles(video),
 			Episode = ep != null ? new Episode(ep, HttpContext) : null,
 			Content = ep?.ParentContent != null ? new Content(ep.ParentContent, HttpContext) : null,
 			Segments = video.VideoSegments.Select(x => new VideoSegment(x))
@@ -96,5 +97,13 @@ public class VideoController(DatabaseContext db) : Controller
 		}
 
 		return r.ToArray();
+	}
+
+	private string[]? GetAttachmentFiles(DatabaseVideo video)
+	{
+		string attachmentsDir = Path.Join(video.Library.Path, video.Id.ToString(), "attachments");
+		return Directory.Exists(attachmentsDir)
+			? Directory.GetFiles(attachmentsDir).Select(x => Path.GetFileName(x)).ToArray()
+			: null;
 	}
 }
