@@ -22,9 +22,21 @@ public class MediaController(DatabaseContext db) : Controller
 			? Path.Join(video.Library.Path, video.Id.ToString(), file)
 			: Path.Join(video.Library.Path, video.Id.ToString(), folder, file);
 
-		string mime = file.Split(".")[1] switch
+		string mime = file.Split(".")[^1] switch
 		{
 			"m3u8" => "application/x-mpegURL",
+			"m4s" => "video/iso.segment",
+			"ts" => "video/mp2t",
+
+			"png" => "image/png",
+			"jpeg" => "image/jpeg",
+			"jpg" => "image/jpeg",
+
+			"srt" => "application/x-subrip",
+			"vtt" => "text/vtt",
+			"ass" => "text/x-ass",
+			"ssa" => "text/x-ssa",
+			
 			_ => "application/octet-stream"
 		};
 
