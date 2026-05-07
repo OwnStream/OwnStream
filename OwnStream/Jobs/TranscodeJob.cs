@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -280,6 +281,55 @@ public class TranscodeJob : IJob
 			{
 				// Ignored
 			}
+		}
+
+		JsonObject probeRes = JsonSerializer.Deserialize<JsonObject>(await new Probe().Start(
+			$"-v quiet -show_chapters -show_streams -select_streams t -of json \"{job.InputPath}\"",
+			cancellationToken))!;
+		JsonArray streams = probeRes["streams"]?.AsArray() ?? [];
+		JsonArray chapters = probeRes["chapters"]?.AsArray() ?? [];
+		if (streams.Count > 0)
+		{
+			DirectoryInfo attachmentsDir = tmpDir.CreateSubdirectory("attachments");
+			for (int i = 0; i < streams.Count; i++)
+			{
+				JsonObject stream = streams[i]!.AsObject();
+				try
+				{
+					string filename = stream["tags"]?["filename"]?.GetValue<string>()!;
+					job.Message = $"[{filename}] Exporting attachment...";
+					job.Progress = i + 1;
+					job.ProgressMax = streams.Count;
+					await db.SaveChangesAsync(cancellationToken);
+					Conversion dumpConv = new();
+					dumpConv.AddParameter(
+						$"-dump_attachment:{stream["index"]!.GetValue<int>()} \"{Path.Join(attachmentsDir.FullName, filename)}\"");
+					dumpConv.AddParameter($"-i \"{job.InputPath}\"");
+					await dumpConv.Start(cancellationToken);
+				}
+				catch (Exception)
+				{
+					continue;
+				}
+			}
+		}
+
+		if (chapters.Count > 0)
+		{
+			StringBuilder sb = new();
+			sb.AppendLine("WEBVTT").AppendLine();
+			foreach (JsonObject chapter in chapters.Select(x => x!.AsObject()))
+			{
+				double start = double.Parse(chapter["start_time"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
+				double end = double.Parse(chapter["end_time"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
+				TimeSpan startTime = TimeSpan.FromSeconds(start);
+				TimeSpan endTime = TimeSpan.FromSeconds(end);
+
+				sb.AppendLine($@"{startTime:hh\:mm\:ss\.fff} --> {endTime:hh\:mm\:ss\.fff}")
+					.AppendLine(chapter["tags"]?["title"]?.GetValue<string>() ?? "Untitled Chapter")
+					.AppendLine();
+			}
+			await File.WriteAllTextAsync(Path.Join(tmpDir.FullName, "chapters.vtt"), sb.ToString(), cancellationToken);
 		}
 
 		job.Message = "Generating the master playlist...";
