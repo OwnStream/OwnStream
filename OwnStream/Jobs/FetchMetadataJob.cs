@@ -197,8 +197,11 @@ public class FetchMetadataJob : IJob
 			episode.ReleasedAt = tmdbEpisode?.AirDate != null
 				? new DateTimeOffset(tmdbEpisode.AirDate.Value).ToUniversalTime()
 				: DateTimeOffset.UnixEpoch;
+			ImageData? firstStill = tmdbEpisode?.Images?.Stills?.FirstOrDefault();
 			if (tmdbEpisode?.StillPath != null)
 				episode.Thumbnail = tmdb.GetImageUrl("original", tmdbEpisode.StillPath, true).ToString();
+			else if (firstStill?.FilePath != null)
+				episode.Thumbnail = tmdb.GetImageUrl("original", firstStill.FilePath, true).ToString();
 
 			foreach (Translation translation in tmdbEpisode?.Translations?.Translations ?? [])
 			{
