@@ -11,6 +11,39 @@ namespace OwnStream.Controllers.Api;
 [ApiController, Route("/api/content/"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
 public class ContentController(DatabaseContext db) : Controller
 {
+	[HttpGet("library")]
+	public IQueryable<Library> GetLibraries() => db.Libraries.Select(x => new Library(x)
+	{
+		Path = $"/{x.Id}",
+		DiskUsage = null
+	});
+
+	[HttpGet("library/{id:guid}")]
+	public PagedResponse<Content> GetLibraryItems(Guid id, DatabaseContent.ContentType? typeFilter = null, int page = 0,
+		int limit = 40)
+	{
+		IQueryable<DatabaseContent> query = db.Content.AsQueryable();
+		if (id != Guid.Empty)
+			query = query.Where(x => x.LibraryId == id);
+		if (typeFilter != null)
+			query = query.Where(x => x.Type == typeFilter);
+
+		int count = query.Count();
+		int pages = (int)Math.Ceiling(count / (float)limit);
+		
+		return new PagedResponse<Content>
+		{
+			Items = query
+				.Skip(page * limit)
+				.Take(limit)
+				.ToArray()
+				.Select(x => new Content(x, HttpContext)),
+			HasMore = pages > page + 1,
+			Count = count,
+			Pages = pages
+		};
+	}
+
 	[HttpGet("{id:guid}/details")]
 	public Content? GetDetails(Guid id)
 	{
