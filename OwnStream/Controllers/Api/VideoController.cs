@@ -39,6 +39,21 @@ public class VideoController(DatabaseContext db) : Controller
 		};
 	}
 
+	[HttpGet("orphaned"), Authorize(AuthenticationSchemes = "ApiToken", Roles = nameof(UserPermissions.Admin))]
+	public IEnumerable<Video> GetOrphaned()
+	{
+		return db.Videos
+			.Include(x => x.Library)
+			.Where(x => x.EpisodeId == null)
+			.ToArray()
+			.Select(x => new Video(x)
+			{
+				Subtitles = GetSubtitles(x),
+				PreviewFiles = GetPreviewFiles(x),
+				Attachments = GetAttachmentFiles(x)
+			});
+	}
+
 	private SubtitleFile[]? GetSubtitles(DatabaseVideo video)
 	{
 		string subtitlesDir = Path.Join(video.Library.Path, video.Id.ToString(), "captions");
