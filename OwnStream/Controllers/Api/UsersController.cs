@@ -103,4 +103,32 @@ public class UsersController(DatabaseContext db) : Controller
 		db.SaveChanges();
 		return new User(newUser);
 	}
+
+	[HttpPost("setupNew"), AllowAnonymous]
+	public User? CreateInitialUser([FromBody] CreateUserRequest request)
+	{
+		if (db.IsSetup())
+		{
+			Response.StatusCode = (int)HttpStatusCode.NotFound;
+			return null;
+		}
+
+		int existing = db.Users.Count(x => x.Username == request.Username);
+		if (existing != 0)
+		{
+			Response.StatusCode = (int)HttpStatusCode.Conflict;
+			return null;
+		}
+
+		DatabaseUser newUser = new()
+		{
+			Id = Guid.NewGuid(),
+			Username = request.Username,
+			PasswordHash = Utils.GetPasswordHash(request.Username, request.Password),
+			Permissions = UserPermissions.Owner
+		};
+		db.Users.Add(newUser);
+		db.SaveChanges();
+		return new User(newUser);
+	}
 }
