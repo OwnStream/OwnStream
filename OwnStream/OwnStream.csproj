@@ -19,6 +19,7 @@
         </PackageReference>
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1"/>
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.Design" Version="1.1.0"/>
+        <PackageReference Include="Octokit" Version="14.0.0" />
         <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
         <PackageReference Include="TMDbLib" Version="3.0.0" />
         <PackageReference Include="Xabe.FFmpeg" Version="6.0.2" />

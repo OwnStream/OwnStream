@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using Octokit;
+using FileMode = System.IO.FileMode;
 
 namespace OwnStream;
 
@@ -9,7 +11,7 @@ public class FrontendManager(ILogger<FrontendManager> logger)
 	public async Task<string?> InstallFrontend()
 	{
 		string source = Utils.GetEnvironmentVariable("OWNSTREAM_FRONTEND_SOURCE") ??
-		                "github://github.com/ownstream/ownstream-web";
+		                "github://github.com/ownstream/ownstream-web/dist.zip";
 		Uri sourceUri = new(source);
 		switch (sourceUri.Scheme)
 		{
@@ -19,11 +21,10 @@ public class FrontendManager(ILogger<FrontendManager> logger)
 				return await InstallFrontendFromUrl(sourceUri);
 			}
 
-			//case "github":
-			//{
-			//	await InstallFrontendFromGithubReleases(sourceUri);
-			//	break;
-			//}
+			case "github":
+			{
+				return await InstallFrontendFromGithubReleases(sourceUri);
+			}
 
 			default:
 			{
@@ -31,6 +32,26 @@ public class FrontendManager(ILogger<FrontendManager> logger)
 				return null;
 			}
 		}
+	}
+
+	private async Task<string> InstallFrontendFromGithubReleases(Uri sourceUri)
+	{
+		string[] parts = sourceUri.AbsolutePath.Split('/');
+		string owner = parts[1];
+		string repo = parts[2];
+		string assetFileName = parts[3];
+
+		logger.LogInformation("Getting the latest release from {Owner}/{Repo}", owner, repo);
+		ReleasesClient client = new(new ApiConnection(new Connection(new ProductHeaderValue("OwnStream"))));
+		Release latestRelease = await client.GetLatest(owner, repo);
+		logger.LogInformation("Release found: Downloading version {Version}", latestRelease.Name);
+		ReleaseAsset? asset = latestRelease.Assets.FirstOrDefault(a => a.Name == assetFileName);
+		if (asset != null) return await InstallFrontendFromUrl(new Uri(asset.BrowserDownloadUrl));
+
+		logger.LogCritical(
+			"Could not find frontend asset {AssetFileName} in release {ReleaseName}. Available assets: {Available}",
+			assetFileName, latestRelease.Name, string.Join(", ", latestRelease.Assets.Select(x => x.Name)));
+		throw new Exception("Could not find frontend asset");
 	}
 
 	private async Task<string> InstallFrontendFromUrl(Uri sourceUri)
