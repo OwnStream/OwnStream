@@ -9,7 +9,7 @@ using OwnStream.Database.Models;
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/manage/webhooks/"), EnableCors("Api"),
- Authorize(Roles = nameof(UserPermissions.ReadWebhooks), AuthenticationSchemes = "ApiToken")]
+ Authorize(Roles = nameof(UserPermissions.ReadWebhooks))]
 public class WebhooksController(DatabaseContext db) : Controller
 {
 	[HttpGet("list")]

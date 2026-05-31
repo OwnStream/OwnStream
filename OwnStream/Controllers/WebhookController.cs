@@ -14,42 +14,6 @@ public class WebhookController(
 	DatabaseContext db,
 	IFfmpegJobQueueService queueService) : Controller
 {
-	[Authorize(Roles = nameof(UserPermissions.ReadWebhooks))]
-	public IActionResult Index() => View(db.Webhooks.ToArray());
-
-	[Authorize(Roles = nameof(UserPermissions.ReadWebhooks))]
-	public IActionResult Detail(Guid id)
-	{
-		DatabaseWebhook? webhook = db.Webhooks.Find(id);
-		if (webhook == null) return RedirectToAction(nameof(Index));
-		return View(webhook);
-	}
-
-	[Authorize(Roles = nameof(UserPermissions.WriteWebhooks)), HttpGet]
-	public IActionResult Create() => View(db.Libraries.ToArray());
-
-	[Authorize(Roles = nameof(UserPermissions.WriteWebhooks)), HttpPost]
-	public async Task<IActionResult> Create([FromForm] string? name, [FromForm] string? authentication,
-		[FromForm] bool deleteOnConvert, [FromForm] Guid libraryId)
-	{
-		if (name == null) return BadRequest("Name cannot be empty");
-		DatabaseLibrary? library = db.Libraries.Find(libraryId);
-		if (library == null) return BadRequest("Library cannot be found");
-
-		DatabaseWebhook webhook = new()
-		{
-			Id = Guid.NewGuid(),
-			LibraryId = libraryId,
-			Name = name,
-			Authentication = authentication ?? "",
-			DeleteOnConvert = deleteOnConvert,
-		};
-		db.Add(webhook);
-		await db.SaveChangesAsync();
-
-		return RedirectToAction(nameof(Detail), new { id = webhook.Id });
-	}
-
 	[Route("/api/webhook/{id:guid}/radarr")]
 	public IActionResult HandleRadarr([FromRoute] Guid id, [FromBody] RadarrWebhookBody body)
 	{

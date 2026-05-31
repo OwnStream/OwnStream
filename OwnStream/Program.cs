@@ -12,16 +12,13 @@ using OwnStream.Services;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews()
-	.AddJsonOptions(options =>
-	{
-		options.JsonSerializerOptions.Converters.Add(new DateTimeOffsetConverter());
-	});
+builder.Services.AddControllers()
+	.AddJsonOptions(options => { options.JsonSerializerOptions.Converters.Add(new DateTimeOffsetConverter()); });
 builder.Services.AddDbContext<DatabaseContext>();
 builder.Services.AddAuthentication(options =>
 	{
-		options.DefaultAuthenticateScheme = "Cookies";
-		options.DefaultChallengeScheme = "Cookies";
+		options.DefaultAuthenticateScheme = "ApiToken";
+		options.DefaultChallengeScheme = "ApiToken";
 	})
 	.AddScheme<JwtAuth.SchemeOptions, JwtAuth>("ApiToken", options =>
 	{
@@ -31,45 +28,27 @@ builder.Services.AddAuthentication(options =>
 				"Environment variable JWT_KEY is not set! Using a random JWT key, which means that logins will not be persisted across service restarts.");
 
 		options.JwtKey = Convert.FromHexString(jwtKey ?? new Random().GetHexString(32));
-	})
-	.AddCookie("Cookies", options =>
-	{
-		options.LoginPath = "/Auth/Login";
-		options.Events = new CookieAuthenticationEvents
-		{
-			OnValidatePrincipal = async context =>
-			{
-				DatabaseContext db = context.HttpContext.RequestServices.GetRequiredService<DatabaseContext>();
-				Guid? id = Guid.TryParse(context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "",
-					out Guid userId)
-					? userId
-					: null;
-				if (id == null || !db.Users.Any(x => x.Id == id))
-				{
-					context.RejectPrincipal();
-					await context.HttpContext.SignOutAsync("Cookies");
-				}
-			}
-		};
 	});
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(Configuration.LoadConfiguration());
 builder.Services.AddSingleton<JobManager>();
 builder.Services.AddSingleton<JobCancellationService>();
+builder.Services.AddSingleton<FrontendManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 builder.Services.AddCors(options =>
+{
+	options.AddPolicy("Api", policyBuilder =>
 	{
-		options.AddPolicy("Api", policyBuilder =>
-		{
-			policyBuilder.AllowAnyOrigin();
-			policyBuilder.AllowAnyHeader();
-			policyBuilder.AllowAnyMethod();
-		});	
+		policyBuilder.AllowAnyOrigin();
+		policyBuilder.AllowAnyHeader();
+		policyBuilder.AllowAnyMethod();
 	});
+});
 
 WebApplication app = builder.Build();
 
+string? frontendPath = null;
 using (IServiceScope scope = app.Services.CreateScope())
 {
 	DatabaseContext db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
@@ -92,14 +71,18 @@ using (IServiceScope scope = app.Services.CreateScope())
 			x.ProgressMax = null;
 		});
 	await db.SaveChangesAsync();
-	
+
 	JobManager jobManager = scope.ServiceProvider.GetRequiredService<JobManager>();
 	jobManager.Init();
+
+	FrontendManager frontendManager = scope.ServiceProvider.GetRequiredService<FrontendManager>();
+	frontendPath = await frontendManager.InstallFrontend();
 }
 
 if (!app.Environment.IsDevelopment())
 {
-	app.UseExceptionHandler("/Home/Error");
+	// TODO: Custom JSON-based error response
+	// app.UseExceptionHandler("/Home/Error");
 	app.UseHsts();
 }
 
@@ -109,11 +92,42 @@ app.UseCors("Api");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
-
 app.MapControllerRoute(
-		name: "default",
-		pattern: "{controller=Home}/{action=Index}/{id?}")
-	.WithStaticAssets();
+	name: "default",
+	pattern: "{controller=Home}/{action=Index}/{id?}");
+
+if (frontendPath != null)
+	app.MapFallback("{**path}", async context =>
+	{
+		FileInfo filePath = new(Path.Combine(frontendPath!, context.Request.Path.ToString().TrimStart("/").ToString()));
+		FileInfo indexPath = new(Path.Combine(frontendPath!, "index.html"));
+
+		if (filePath.Exists && !Directory.Exists(filePath.FullName))
+		{
+			string extension = filePath.Extension.ToLowerInvariant();
+			context.Response.ContentType = extension switch
+			{
+				".js" => "application/javascript",
+				".css" => "text/css",
+
+				_ => "application/octet-stream"
+			};
+			await context.Response.SendFileAsync(filePath.FullName);
+		}
+		else if (indexPath.Exists)
+		{
+			string content = await File.ReadAllTextAsync(indexPath.FullName);
+			content = content.Replace("%%OWNSTREAM_INSTANCE_HOST%%", "/");
+			context.Response.ContentType = "text/html";
+			await context.Response.WriteAsync(content);
+		}
+		else
+		{
+			context.Response.StatusCode = 404;
+			await context.Response.WriteAsync("Frontend not installed properly.");
+		}
+	});
+else
+	Console.WriteLine("Frontend not installed properly, web app will not be available");
 
 app.Run();

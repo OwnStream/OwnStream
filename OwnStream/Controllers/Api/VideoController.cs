@@ -8,7 +8,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/video/"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
+[ApiController, Route("/api/video/"), Authorize, EnableCors("Api")]
 public class VideoController(DatabaseContext db) : Controller
 {
 	[HttpGet("{id:guid}")]
@@ -39,7 +39,7 @@ public class VideoController(DatabaseContext db) : Controller
 		};
 	}
 
-	[HttpGet("orphaned"), Authorize(AuthenticationSchemes = "ApiToken", Roles = nameof(UserPermissions.Admin))]
+	[HttpGet("orphaned"), Authorize(Roles = nameof(UserPermissions.Admin))]
 	public IEnumerable<Video> GetOrphaned()
 	{
 		return db.Videos

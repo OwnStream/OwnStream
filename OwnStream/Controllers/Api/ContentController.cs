@@ -8,7 +8,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/content/"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
+[ApiController, Route("/api/content/"), Authorize, EnableCors("Api")]
 public class ContentController(DatabaseContext db) : Controller
 {
 	[HttpGet("library")]

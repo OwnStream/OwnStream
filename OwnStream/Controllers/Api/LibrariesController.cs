@@ -9,7 +9,7 @@ using OwnStream.Database.Models;
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/manage/libraries/"), EnableCors("Api"),
- Authorize(Roles = nameof(UserPermissions.WriteLibraries), AuthenticationSchemes = "ApiToken")]
+ Authorize(Roles = nameof(UserPermissions.WriteLibraries))]
 public class LibrariesController(DatabaseContext db) : Controller
 {
 	[HttpGet("list")]

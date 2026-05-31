@@ -43,13 +43,13 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 
 	private static bool benchmarkRunning = false;
 
-	[HttpGet("get"), Authorize(Roles = nameof(UserPermissions.ReadSettings), AuthenticationSchemes = "ApiToken")]
+	[HttpGet("get"), Authorize(Roles = nameof(UserPermissions.ReadSettings))]
 	public IActionResult Get()
 	{
 		return Json(config);
 	}
 
-	[HttpPost("update"), Authorize(Roles = nameof(UserPermissions.WriteSettings), AuthenticationSchemes = "ApiToken")]
+	[HttpPost("update"), Authorize(Roles = nameof(UserPermissions.WriteSettings))]
 	public IActionResult Update([FromBody] Configuration newConfig)
 	{
 		config.Transcode = newConfig.Transcode;
@@ -57,7 +57,7 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 		return Json(config);
 	}
 
-	[HttpGet("benchmark"), Authorize(Roles = nameof(UserPermissions.Admin), AuthenticationSchemes = "ApiToken")]
+	[HttpGet("benchmark"), Authorize(Roles = nameof(UserPermissions.Admin))]
 	public async Task RunBenchmark()
 	{
 		Response.ContentType = "text/event-stream";

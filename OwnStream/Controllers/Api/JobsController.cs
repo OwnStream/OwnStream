@@ -12,7 +12,7 @@ namespace OwnStream.Controllers.Api;
 [ApiController, Route("/api/jobs/"), EnableCors("Api")]
 public class JobsController(DatabaseContext db, JobCancellationService jobCancellationService) : Controller
 {
-	[HttpGet("list"), Authorize(Roles = nameof(UserPermissions.ReadJobs), AuthenticationSchemes = "ApiToken")]
+	[HttpGet("list"), Authorize(Roles = nameof(UserPermissions.ReadJobs))]
 	public PagedResponse<Job> GetJobs(long delta = 0, int page = 0, int limit = 20)
 	{
 		DateTimeOffset lastUpdated = DateTimeOffset.FromUnixTimeMilliseconds(delta);
@@ -35,7 +35,7 @@ public class JobsController(DatabaseContext db, JobCancellationService jobCancel
 	}
 
 	[HttpGet("{id:guid}/requeue"),
-	 Authorize(Roles = nameof(UserPermissions.WriteJobs), AuthenticationSchemes = "ApiToken")]
+	 Authorize(Roles = nameof(UserPermissions.WriteJobs))]
 	public SuccessResponse<Job> RequeueJob(Guid id)
 	{
 		DatabaseFfmpegJob? job = db.FfmpegJobs.Find(id);
@@ -62,7 +62,7 @@ public class JobsController(DatabaseContext db, JobCancellationService jobCancel
 	}
 
 	[HttpGet("{id:guid}/stop"),
-	 Authorize(Roles = nameof(UserPermissions.WriteJobs), AuthenticationSchemes = "ApiToken")]
+	 Authorize(Roles = nameof(UserPermissions.WriteJobs))]
 	public SuccessResponse<Job> StopJob(Guid id)
 	{
 		DatabaseFfmpegJob? job = db.FfmpegJobs.Find(id);

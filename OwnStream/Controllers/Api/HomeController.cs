@@ -10,7 +10,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/home"), Authorize(AuthenticationSchemes = "ApiToken"), EnableCors("Api")]
+[ApiController, Route("/api/home"), Authorize, EnableCors("Api")]
 public class HomeController(DatabaseContext db) : Controller
 {
 	[HttpGet("shelves")]

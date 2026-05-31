@@ -10,7 +10,7 @@ using OwnStream.Database.Models;
 
 namespace OwnStream.Controllers.Api;
 
-[ApiController, Route("/api/progress/"), Authorize(AuthenticationSchemes = "Cookies,ApiToken"), EnableCors("Api")]
+[ApiController, Route("/api/progress/"), Authorize, EnableCors("Api")]
 public class WatchProgressController(DatabaseContext db) : Controller
 {
 	[HttpPost("update")]

@@ -25,7 +25,7 @@ public class AuthController(DatabaseContext db) : Controller
 		return SignIn(principal, "ApiToken");
 	}
 
-	[HttpGet("whoami"), Authorize(AuthenticationSchemes = "ApiToken")]
+	[HttpGet("whoami"), Authorize]
 	public User WhoAmI()
 	{
 		DatabaseUser? user =

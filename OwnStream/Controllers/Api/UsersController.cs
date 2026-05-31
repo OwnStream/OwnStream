@@ -11,7 +11,7 @@ using OwnStream.Database.Models;
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/manage/users/"), EnableCors("Api"),
- Authorize(Roles = nameof(UserPermissions.ReadAllUsers), AuthenticationSchemes = "ApiToken")]
+ Authorize(Roles = nameof(UserPermissions.ReadAllUsers))]
 public class UsersController(DatabaseContext db) : Controller
 {
 	[HttpGet("list")]
@@ -36,7 +36,7 @@ public class UsersController(DatabaseContext db) : Controller
 		return new User(user);
 	}
 
-	[HttpPost("{id:guid}"), Authorize(Roles = nameof(UserPermissions.WriteUsers), AuthenticationSchemes = "ApiToken")]
+	[HttpPost("{id:guid}"), Authorize(Roles = nameof(UserPermissions.WriteUsers))]
 	public User? ModifyUser(Guid id, [FromBody] ModifyUserRequest request)
 	{
 		DatabaseUser? currentUser =
@@ -66,7 +66,7 @@ public class UsersController(DatabaseContext db) : Controller
 		return new User(user);
 	}
 
-	[HttpDelete("{id:guid}"), Authorize(Roles = nameof(UserPermissions.WriteUsers), AuthenticationSchemes = "ApiToken")]
+	[HttpDelete("{id:guid}"), Authorize(Roles = nameof(UserPermissions.WriteUsers))]
 	public IActionResult? DeleteUser(Guid id)
 	{
 		DatabaseUser? user = db.Users.Find(id);
@@ -82,7 +82,7 @@ public class UsersController(DatabaseContext db) : Controller
 		return Json(new { });
 	}
 
-	[HttpPost("new"), Authorize(Roles = nameof(UserPermissions.WriteUsers), AuthenticationSchemes = "ApiToken")]
+	[HttpPost("new"), Authorize(Roles = nameof(UserPermissions.WriteUsers))]
 	public User? CreateUser([FromBody] CreateUserRequest request)
 	{
 		int existing = db.Users.Count(x => x.Username == request.Username);
