@@ -116,10 +116,8 @@ if (frontendPath != null)
 		}
 		else if (indexPath.Exists)
 		{
-			string content = await File.ReadAllTextAsync(indexPath.FullName);
-			content = content.Replace("%%OWNSTREAM_INSTANCE_HOST%%", "/");
 			context.Response.ContentType = "text/html";
-			await context.Response.WriteAsync(content);
+			await context.Response.SendFileAsync(indexPath.FullName);
 		}
 		else
 		{
