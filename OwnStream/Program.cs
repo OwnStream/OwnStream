@@ -25,7 +25,7 @@ builder.Services.AddAuthentication(options =>
 		string? jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
 		if (jwtKey is null)
 			Console.WriteLine(
-				"Environment variable JWT_KEY is not set! Using a random JWT key, which means that logins will not be persisted across service restarts.");
+				"Environment variable JWT_KEY is not set! Using a random JWT key, which means that logins will not be persisted across service restarts, and quick login will not be available.");
 
 		options.JwtKey = Convert.FromHexString(jwtKey ?? new Random().GetHexString(32));
 	});

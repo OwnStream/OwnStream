@@ -64,16 +64,21 @@ public class JwtAuth(IOptionsMonitor<JwtAuth.SchemeOptions> options, ILoggerFact
 
 	protected override Task HandleSignInAsync(ClaimsPrincipal user, AuthenticationProperties? properties)
 	{
+		Response.StatusCode = 200;
+		Response.ContentType = "application/json";
+		Response.WriteAsJsonAsync(new LoginResponse(user.FindFirst(ClaimTypes.Name)?.Value ?? "", GetToken(user, Options.JwtKey)));
+		return Task.CompletedTask;
+	}
+
+	internal static string GetToken(ClaimsPrincipal user, byte[] jwtKey)
+	{
 		JsonObject jwtBody = new()
 		{
 			{ "iat", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
 			{ "sub", user.FindFirst(ClaimTypes.NameIdentifier)?.Value },
 			{ "name", user.FindFirst(ClaimTypes.Name)?.Value },
 		};
-		Response.StatusCode = 200;
-		Response.ContentType = "application/json";
-		Response.WriteAsJsonAsync(new LoginResponse(user.FindFirst(ClaimTypes.Name)?.Value ?? "", Encoder.Encode(jwtBody, Options.JwtKey)));
-		return Task.CompletedTask;
+		return Encoder.Encode(jwtBody, jwtKey);
 	}
 
 	public class SchemeOptions : AuthenticationSchemeOptions
