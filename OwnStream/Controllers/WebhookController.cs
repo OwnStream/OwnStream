@@ -101,9 +101,12 @@ public class WebhookController(
 		Guid videoId = Guid.NewGuid();
 		DatabaseContent? relevantContent = db.Content
 			.Include(x => x.Episodes)
+			.Include(x => x.ExternalIds)
 			.FirstOrDefault(x =>
-				x.ImdbId == body.Series.ImdbId && x.TmdbId == body.Series.TmdbId && x.TvdbId == body.Series.TvdbId &&
-				x.TvMazeId == body.Series.TvMazeId && x.LibraryId == webhook.LibraryId);
+				x.ExternalIds.Any(c => c.ProviderId == "imdb" && c.ExternalId == body.Series.ImdbId) &&
+				x.ExternalIds.Any(c => c.ProviderId == "tmdb" && c.ExternalId == body.Series.TmdbId.ToString()) &&
+				x.ExternalIds.Any(c => c.ProviderId == "tvMaze" && c.ExternalId == body.Series.TvMazeId.ToString()) &&
+				x.LibraryId == webhook.LibraryId);
 		DatabaseFfmpegJob job = await queueService.EnqueueAsync("TranscodeFull", body.EpisodeFile.Path,
 			Path.Join(webhook.Library.Path, videoId.ToString()),
 			new TranscodeJob.Arguments
@@ -152,6 +155,7 @@ public class WebhookController(
 			[JsonPropertyName("path")] public string Path { get; set; }
 		}
 	}
+
 	public class SonarrWebhookBody
 	{
 		[JsonPropertyName("eventType")] public string Type { get; set; }

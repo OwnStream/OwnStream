@@ -70,9 +70,10 @@ public class FetchMetadataJob : IJob
 		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId,
 			cancellationToken);
 
-		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId)) content.ImdbId = pImdbId;
+		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId))
+			SetExternalId(content, "imdb", pImdbId);
 		if (args.ProviderIds.TryGetValue("tmdb", out string? pTmdbId) && int.TryParse(pTmdbId, out int iTmdbId))
-			content.TmdbId = iTmdbId;
+			SetExternalId(content, "tmdb", iTmdbId.ToString());
 
 		content.Title = tmdbMovie?.OriginalTitle ?? tmdbMovie?.Title ?? "Missing title";
 		content.Tagline = tmdbMovie?.Tagline ?? "";
@@ -134,13 +135,14 @@ public class FetchMetadataJob : IJob
 
 		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId,
 			cancellationToken);
-		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId)) content.ImdbId = pImdbId;
+		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId))
+			SetExternalId(content, "imdb", pImdbId);
 		if (args.ProviderIds.TryGetValue("tmdb", out string? pTmdbId) && int.TryParse(pTmdbId, out int iTmdbId))
-			content.TmdbId = iTmdbId;
+			SetExternalId(content, "tmdb", iTmdbId.ToString());
 		if (args.ProviderIds.TryGetValue("tvdb", out string? pTvdbId) && int.TryParse(pTvdbId, out int iTvdbId))
-			content.TvdbId = iTvdbId;
+			SetExternalId(content, "tvdb", iTvdbId.ToString());
 		if (args.ProviderIds.TryGetValue("tvMaze", out string? pTvMazeId) && int.TryParse(pTvMazeId, out int iTvMazeId))
-			content.TvMazeId = iTvMazeId;
+			SetExternalId(content, "tvMaze", iTvMazeId.ToString());
 
 		content.Title = tmdbShow?.OriginalName ?? tmdbShow?.Name ?? "Missing title";
 		content.Tagline = tmdbShow?.Tagline ?? "";
@@ -230,9 +232,13 @@ public class FetchMetadataJob : IJob
 		CancellationToken cancellationToken)
 	{
 		int? tmdbId = int.TryParse(providerIds["tmdb"], out int r) ? r : null;
-		DatabaseContent? existing = await db.Content.FirstOrDefaultAsync(
-			x => x.TmdbId == tmdbId && x.LibraryId == libraryId && x.Type == type,
-			cancellationToken: cancellationToken);
+		DatabaseContent? existing = await db.Content
+			.Include(x => x.ExternalIds)
+			.FirstOrDefaultAsync(x =>
+					x.ExternalIds.Any(c => c.ProviderId == "tmdb" && c.ExternalId == tmdbId.ToString()) &&
+					x.LibraryId == libraryId &&
+					x.Type == type,
+				cancellationToken: cancellationToken);
 		if (existing != null) return existing;
 
 		existing = new DatabaseContent
@@ -265,6 +271,31 @@ public class FetchMetadataJob : IJob
 		};
 		db.Episode.Add(existing);
 		return existing;
+	}
+
+	private static void SetExternalId(DatabaseContent content, string providerId, string? externalId)
+	{
+		DatabaseContentExternalId? existing = content.ExternalIds
+			.FirstOrDefault(x => x.ProviderId == providerId);
+
+		if (string.IsNullOrWhiteSpace(externalId))
+		{
+			if (existing != null)
+				content.ExternalIds.Remove(existing);
+		}
+		else if (existing == null)
+		{
+			content.ExternalIds.Add(new DatabaseContentExternalId
+			{
+				ContentId = content.Id,
+				ProviderId = providerId,
+				ExternalId = externalId
+			});
+		}
+		else
+		{
+			existing.ExternalId = externalId;
+		}
 	}
 
 	public class Arguments

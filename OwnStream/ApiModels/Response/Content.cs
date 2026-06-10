@@ -27,15 +27,8 @@ public class Content(DatabaseContent content, HttpContext context)
 
 	public Dictionary<string, string> AgeRatings { get; set; } = content.AgeRatings;
 
-	public Dictionary<string, string> ExternalIds { get; set; } = new Dictionary<string, string?>()
-		{
-			["imdb"] = content.ImdbId,
-			["tmdb"] = content.TmdbId?.ToString(),
-			["tvdb"] = content.TvdbId?.ToString(),
-			["tvMaze"] = content.TvMazeId?.ToString()
-		}
-		.Where(x => x.Value != null)
-		.ToDictionary(x => x.Key, x => x.Value!);
+	public Dictionary<string, string> ExternalIds { get; set; } = content.ExternalIds
+		.ToDictionary(x => x.ProviderId, x => x.ExternalId);
 
 	public class ContentImages(DatabaseContent content)
 	{

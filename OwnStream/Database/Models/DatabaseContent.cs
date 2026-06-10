@@ -25,10 +25,7 @@ public class DatabaseContent
 	public DateTimeOffset? FinishedStreamingAt { get; set; }
 	
 	public Dictionary<string, string> AgeRatings { get; set; } = [];
-	public string? ImdbId { get; set; }
-	public int? TmdbId { get; set; }
-	public int? TvdbId { get; set; }
-	public int? TvMazeId { get; set; }
+	public ICollection<DatabaseContentExternalId> ExternalIds { get; } = new List<DatabaseContentExternalId>();
 	public ICollection<DatabaseEpisode> Episodes { get; } = new List<DatabaseEpisode>();
 	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
 	

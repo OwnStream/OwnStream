@@ -17,6 +17,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseEpisode> Episode { get; set; }
 	public DbSet<DatabaseWatchProgress> WatchProgress { get; set; }
 	public DbSet<DatabaseVideoSegment> VideoSegments { get; set; }
+	public DbSet<DatabaseContentExternalId> ContentExternalIds { get; set; }
 
 	private static void PrepareDataSource()
 	{
@@ -65,6 +66,14 @@ public class DatabaseContext : DbContext
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Video).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.VideoId).OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.Entity<DatabaseEpisode>().HasOne(x => x.ParentContent).WithMany(x => x.Episodes).HasForeignKey(x => x.ParentContentId).OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.Entity<DatabaseVideo>().HasOne(x => x.Episode).WithMany(x => x.Videos).HasForeignKey(x => x.EpisodeId).OnDelete(DeleteBehavior.SetNull);
+		
+		modelBuilder.Entity<DatabaseContentExternalId>().HasKey(x => new { x.ContentId, x.ProviderId });
+		modelBuilder.Entity<DatabaseContentExternalId>().HasIndex(x => new { x.ProviderId, x.ExternalId });
+		modelBuilder.Entity<DatabaseContentExternalId>()
+			.HasOne(x => x.Content)
+			.WithMany(x => x.ExternalIds)
+			.HasForeignKey(x => x.ContentId)
+			.OnDelete(DeleteBehavior.Cascade);
 	}
 
 	public bool IsSetup() => Users.Any();

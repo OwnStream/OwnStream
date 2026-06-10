@@ -48,6 +48,7 @@ public class ContentController(DatabaseContext db) : Controller
 	public Content? GetDetails(Guid id)
 	{
 		DatabaseContent? content = db.Content
+			.Include(x => x.ExternalIds)
 			.Include(x => x.Episodes)
 			.ThenInclude(x => x.Videos)
 			.FirstOrDefault(x => x.Id == id);
