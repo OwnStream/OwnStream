@@ -30,12 +30,30 @@ public class Content(DatabaseContent content, HttpContext context)
 	public Dictionary<string, string> ExternalIds { get; set; } = content.ExternalIds
 		.ToDictionary(x => x.ProviderId, x => x.ExternalId);
 
-	public class ContentImages(DatabaseContent content)
+	public class ContentImages
 	{
-		public string? Poster { get; set; } = content.Poster;
-		public string? Banner { get; set; } = content.Banner;
-		public string? Logo { get; set; } = content.Logo;
-		public string? Backdrop { get; set; } = content.Backdrop;
-		public string? Thumbnail { get; set; } = content.Thumbnail;
+		public string? Poster { get; set; }
+		public string? Banner { get; set; }
+		public string? Logo { get; set; }
+		public string? Backdrop { get; set; }
+		public string? Thumbnail { get; set; }
+
+		public ContentImages(DatabaseContent content)
+		{
+			Poster = content.Poster;
+			Banner = content.Banner;
+			Logo = content.Logo;
+			Backdrop = content.Backdrop;
+			Thumbnail = content.Thumbnail;
+		}
+
+		public ContentImages(DatabaseEpisode episode, DatabaseContent content)
+		{
+			Poster = content.Poster;
+			Banner = content.Banner;
+			Logo = content.Logo;
+			Backdrop = content.Backdrop;
+			Thumbnail = episode.Thumbnail ?? content.Thumbnail;
+		}
 	}
 }
