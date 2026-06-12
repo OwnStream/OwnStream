@@ -244,6 +244,8 @@ public class TranscodeJob : IJob
 		{
 			ISubtitleStream subtitle = subtitles[i];
 			job.Message = $"Extracting subtitles {i + 1}/{subtitles.Length}";
+			job.Progress = i;
+			job.ProgressMax = subtitles.Length;
 			await db.SaveChangesAsync(cancellationToken);
 
 			StringBuilder name = new();
