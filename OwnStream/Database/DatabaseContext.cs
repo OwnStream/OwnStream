@@ -18,6 +18,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseWatchProgress> WatchProgress { get; set; }
 	public DbSet<DatabaseVideoSegment> VideoSegments { get; set; }
 	public DbSet<DatabaseContentExternalId> ContentExternalIds { get; set; }
+	public DbSet<DatabaseInputLibrary> InputLibraries { get; set; }
 
 	private static void PrepareDataSource()
 	{

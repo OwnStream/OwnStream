@@ -320,7 +320,8 @@ public class TranscodeJob : IJob
 			sb.AppendLine("WEBVTT").AppendLine();
 			foreach (JsonObject chapter in chapters.Select(x => x!.AsObject()))
 			{
-				double start = double.Parse(chapter["start_time"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
+				double start = double.Parse(chapter["start_time"]?.GetValue<string>() ?? "0",
+					CultureInfo.InvariantCulture);
 				double end = double.Parse(chapter["end_time"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
 				TimeSpan startTime = TimeSpan.FromSeconds(start);
 				TimeSpan endTime = TimeSpan.FromSeconds(end);
@@ -329,6 +330,7 @@ public class TranscodeJob : IJob
 					.AppendLine(chapter["tags"]?["title"]?.GetValue<string>() ?? "Untitled Chapter")
 					.AppendLine();
 			}
+
 			await File.WriteAllTextAsync(Path.Join(tmpDir.FullName, "chapters.vtt"), sb.ToString(), cancellationToken);
 		}
 
@@ -426,31 +428,35 @@ public class TranscodeJob : IJob
 			}
 		}
 
-		DatabaseFfmpegJob metadataJob = new()
+		if (args.Metadata != null)
 		{
-			Id = Guid.NewGuid(),
-			JobType = "FetchMetadata",
-			InputPath = "",
-			OutputPath = "",
-			Arguments = JsonSerializer.Serialize(new FetchMetadataJob.Arguments
+			DatabaseFfmpegJob metadataJob = new()
 			{
-				VideoId = args.VideoId,
-				LibraryId = args.LibraryId,
-				Type = args.Metadata["type"],
-				Season = int.Parse(args.Metadata["season"]),
-				Episode = int.Parse(args.Metadata["episode"]),
-				ProviderIds = args.Metadata.Where(x => x.Key.EndsWith("id"))
-					.ToDictionary(x => x.Key[..^2], x => x.Value)
-			}),
-			Status = DatabaseFfmpegJob.JobStatus.Pending,
-			// We want it done as soon as possible, so abuse this field to make it run right after this job
-			CreatedAt = job.CreatedAt.AddSeconds(1),
-			RelevantVideoId = job.RelevantVideoId,
-			RelevantEpisodeId = job.RelevantEpisodeId,
-			RelevantContentId = job.RelevantContentId,
-			RelevantLibraryId = job.RelevantLibraryId,
-			RelevantWebhookId = job.RelevantWebhookId,
-		};
+				Id = Guid.NewGuid(),
+				JobType = "FetchMetadata",
+				InputPath = "",
+				OutputPath = "",
+				Arguments = JsonSerializer.Serialize(new FetchMetadataJob.Arguments
+				{
+					VideoId = args.VideoId,
+					LibraryId = args.LibraryId,
+					Type = args.Metadata["type"],
+					Season = int.Parse(args.Metadata["season"]),
+					Episode = int.Parse(args.Metadata["episode"]),
+					ProviderIds = args.Metadata.Where(x => x.Key.EndsWith("id"))
+						.ToDictionary(x => x.Key[..^2], x => x.Value)
+				}),
+				Status = DatabaseFfmpegJob.JobStatus.Pending,
+				// We want it done as soon as possible, so abuse this field to make it run right after this job
+				CreatedAt = job.CreatedAt.AddSeconds(1),
+				RelevantVideoId = job.RelevantVideoId,
+				RelevantEpisodeId = job.RelevantEpisodeId,
+				RelevantContentId = job.RelevantContentId,
+				RelevantLibraryId = job.RelevantLibraryId,
+				RelevantWebhookId = job.RelevantWebhookId,
+			};
+			db.FfmpegJobs.AddRange(metadataJob);
+		}
 
 		DatabaseFfmpegJob fingerprintsJob = new()
 		{
@@ -470,14 +476,14 @@ public class TranscodeJob : IJob
 			RelevantLibraryId = job.RelevantLibraryId,
 			RelevantWebhookId = job.RelevantWebhookId,
 		};
-		db.FfmpegJobs.AddRange(metadataJob, fingerprintsJob);
+		db.FfmpegJobs.AddRange(fingerprintsJob);
 		await db.SaveChangesAsync(cancellationToken);
 	}
 
 	public class Arguments
 	{
 		public bool DeleteAfterTranscode { get; set; }
-		public Dictionary<string, string> Metadata { get; set; }
+		public Dictionary<string, string>? Metadata { get; set; }
 		public Guid VideoId { get; set; }
 		public Guid LibraryId { get; set; }
 	}
