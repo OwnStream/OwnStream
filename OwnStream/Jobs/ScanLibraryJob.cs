@@ -105,7 +105,7 @@ public partial class ScanLibraryJob : IJob
 			if (job.Progress % 5 == 0)
 				await db.SaveChangesAsync();
 
-			foreach (ParsedEpisode episode in show.Episodes)
+			foreach (ParsedEpisode episode in show.Episodes.OrderBy(x => x.Season).ThenBy(x => x.Episode))
 			{
 				if (episode.Season == null || episode.Episode == null)
 				{
@@ -164,7 +164,7 @@ public partial class ScanLibraryJob : IJob
 				id => db.ContentExternalIds.Where(x => x.ContentId == id)
 					.ToDictionary(e => e.ProviderId, e => e.ExternalId));
 
-		foreach (ParsedEpisode episode in newEpisodes)
+		foreach (ParsedEpisode episode in newEpisodes.OrderBy(x => x.Season).ThenBy(x => x.Episode))
 		{
 			if (episode.Season == null || episode.Episode == null || episode.ContentId == null)
 			{
