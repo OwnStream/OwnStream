@@ -132,9 +132,18 @@ public partial class ScanLibraryJob : IJob
 					ReleasedAt = DateTimeOffset.UnixEpoch
 				};
 				db.Episode.Add(dbEpisode);
+				Guid videoId = Guid.NewGuid();
+				await queueService.EnqueueAsync("TranscodeFull", episode.Filename,
+					Path.Join(transcodeLibrary.Path, videoId.ToString()), new TranscodeJob.Arguments
+					{
+						DeleteAfterTranscode = false,
+						Metadata = null,
+						VideoId = videoId,
+						LibraryId = transcodeLibrary.Id
+					});
 				await queueService.EnqueueAsync("FetchMetadata", "", "", new FetchMetadataJob.Arguments
 				{
-					VideoId = null,
+					VideoId = videoId,
 					LibraryId = transcodeLibrary.Id,
 					Type = "tv",
 					Season = episode.Season,
@@ -193,7 +202,7 @@ public partial class ScanLibraryJob : IJob
 				});
 			await queueService.EnqueueAsync("FetchMetadata", "", "", new FetchMetadataJob.Arguments
 			{
-				VideoId = null,
+				VideoId = videoId,
 				LibraryId = transcodeLibrary.Id,
 				Type = "tv",
 				Season = episode.Season,
