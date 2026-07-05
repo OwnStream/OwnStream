@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using System.Text;
 
 namespace OwnStream.Controllers;
 
@@ -13,7 +14,7 @@ public class MediaController(DatabaseContext db) : Controller
 	[Route("/Media/{id:guid}/{file}")]
 	[Route("/Media/{id:guid}/{folder}/{file}")]
 	[EnableCors("Api")]
-	public IActionResult File(Guid id, string? folder, string file)
+	public IActionResult File(Guid id, string? folder, string file, bool includeFonts = false)
 	{
 		DatabaseVideo? video = db.Videos.Include(x => x.Library)
 			.FirstOrDefault(x => x.Id == id);
@@ -40,7 +41,54 @@ public class MediaController(DatabaseContext db) : Controller
 			_ => "application/octet-stream"
 		};
 
-		if (System.IO.File.Exists(path)) return PhysicalFile(path, mime);
+		if (System.IO.File.Exists(path))
+		{
+			// The only reason for this is for clients that might not support loading fonts over HTTP/S
+			// *cough* libass-android *cough*
+			// No shame toward the developers, fonts are a mess to work with anyway.
+			// However, this MUST be used ONLY as a fallback for when the renderer doesn't take URLs as fonts
+			if (mime is "text/x-ass" or "text/x-ssa" && includeFonts)
+			{
+				string attachmentsPath = Path.Join(video.Library.Path, video.Id.ToString(), "attachments");
+				if (!Directory.Exists(attachmentsPath)) return PhysicalFile(path, mime);
+				string[] fontFiles = Directory.GetFiles(attachmentsPath);
+
+				if (fontFiles.Length <= 0) return PhysicalFile(path, mime);
+				
+				StringBuilder sb = new(System.IO.File.ReadAllText(path));
+				sb.Append("\n[Fonts]\n");
+				foreach (string fontFile in fontFiles)
+				{
+					sb.Append("fontname: ");
+					sb.Append(Path.GetFileName(fontFile).ToLower());
+					sb.Append('\n');
+
+					byte[] data = System.IO.File.ReadAllBytes(fontFile);
+					int linePos = 0;
+					for (int i = 0; i < data.Length; i += 3)
+					{
+						int remaining = data.Length - i;
+						uint chunk = (uint)data[i] << 16;
+						if (remaining > 1) chunk |= (uint)data[i + 1] << 8;
+						if (remaining > 2) chunk |= (uint)data[i + 2];
+
+						int outChars = remaining switch { 1 => 2, 2 => 3, _ => 4 };
+						for (int j = 0; j < outChars; j++)
+						{
+							sb.Append((char)(((chunk >> (18 - j * 6)) & 0x3F) + 33));
+							if (++linePos != 80) continue;
+							sb.Append('\n');
+							linePos = 0;
+						}
+					}
+					if (linePos > 0) sb.Append('\n');
+					sb.Append('\n');
+				}
+
+				return Content(sb.ToString(), mime);
+			}
+			return PhysicalFile(path, mime);
+		}
 		return NotFound();
 	}
 
