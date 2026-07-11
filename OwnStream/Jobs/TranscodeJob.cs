@@ -64,6 +64,8 @@ public class TranscodeJob : IJob
 		List<EncodedAudio> audioStreams = [];
 		conv.AddParameter($"-i \"{job.InputPath}\"");
 
+		int gVal = (int)Math.Round(video.Framerate * 2);
+
 		// TODO: Make configurable
 		List<string> hlsFlags =
 		[
@@ -71,8 +73,8 @@ public class TranscodeJob : IJob
 			"-hls_list_size 0",
 			"-hls_init_time 10",
 			"-hls_time 10",
-			"-g 48",
-			"-keyint_min 48",
+			$"-g {gVal}",
+			$"-keyint_min {gVal}",
 			"-sc_threshold 0",
 			"-hls_flags independent_segments",
 			"-hls_playlist_type vod",
