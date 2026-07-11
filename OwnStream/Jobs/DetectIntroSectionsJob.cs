@@ -13,6 +13,11 @@ public class DetectIntroSectionsJob : IJob
 {
 	private DatabaseContext db = null!;
 	private const string FingerprintsFileName = "fingerprints.fp";
+	private const string ChaptersFileName = "chapters.vtt";
+
+	// TODO: Make configurable
+	private string[] IntroChapterNames = ["Intro", "Opening", "OP"];
+	private string[] OutroChapterNames = ["Credits", "Ending", "ED"];
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
@@ -31,6 +36,7 @@ public class DetectIntroSectionsJob : IJob
 		await db.SaveChangesAsync(cancellationToken);
 
 		string fingerprintsPath = Path.Join(job.OutputPath, FingerprintsFileName);
+		string chaptersPath = Path.Join(job.OutputPath, ChaptersFileName);
 		if (!File.Exists(fingerprintsPath))
 			await GenerateFingerprints(job, fingerprintsPath, cancellationToken);
 
@@ -105,6 +111,31 @@ public class DetectIntroSectionsJob : IJob
 			}
 
 			allRanges = MergeRanges(allRanges);
+
+			// Include the chapters here - compare name to Intro/OutroChapterNames, add to list if they match, merge again
+			if (ep.Chapters != null)
+			{
+				foreach (Chapter chapter in ep.Chapters)
+				{
+					if (IntroChapterNames.Any(name => chapter.Title.Contains(name, StringComparison.OrdinalIgnoreCase))
+					    || OutroChapterNames.Any(name =>
+						    chapter.Title.Contains(name, StringComparison.OrdinalIgnoreCase)))
+					{
+						allRanges.Add(new SimilarRange
+						{
+							LeftStart = (int)Math.Round(chapter.Start.TotalSeconds),
+							RightStart = 0,
+							LeftDuration = (int)(ep.File?.FrameCount ?? 0),
+							RightDuration = 0,
+							Duration = (int)Math.Round((chapter.End - chapter.Start).TotalSeconds),
+							Delta = 0,
+							MergeWithNext = false
+						});
+					}
+				}
+
+				allRanges = MergeRanges(allRanges);
+			}
 
 			db.VideoSegments.RemoveRange(db.VideoSegments.Where(x => x.VideoId == ep.VideoId));
 			db.VideoSegments.AddRange(allRanges.Select(x => new DatabaseVideoSegment
@@ -370,6 +401,7 @@ public class DetectIntroSectionsJob : IJob
 		public int EpisodeNum { get; set; }
 		public string Path { get; set; }
 		public FingerprintFile? File { get; set; }
+		public Chapter[]? Chapters { get; set; }
 
 		public void LoadFile()
 		{
@@ -383,7 +415,55 @@ public class DetectIntroSectionsJob : IJob
 			{
 				// ignored
 			}
+
+			try
+			{
+				using FileStream fs = System.IO.File.OpenRead(System.IO.Path.Join(Path, ChaptersFileName));
+				using StreamReader sr = new(fs);
+				List<Chapter> chapters = [];
+
+				string? line = sr.ReadLine();
+				if (line != "WEBVTT")
+					throw new InvalidDataException("Invalid VTT file format");
+
+				while ((line = sr.ReadLine()) != null)
+				{
+					if (string.IsNullOrWhiteSpace(line))
+						continue;
+
+					string[] parts = line.Split(" --> ");
+					if (parts.Length != 2)
+						continue;
+
+					TimeSpan start = TimeSpan.Parse(parts[0].Trim());
+					TimeSpan end = TimeSpan.Parse(parts[1].Trim());
+
+					string? title = sr.ReadLine();
+					if (string.IsNullOrWhiteSpace(title))
+						continue;
+
+					chapters.Add(new Chapter
+					{
+						Title = title,
+						Start = start,
+						End = end
+					});
+				}
+
+				Chapters = chapters.ToArray();
+			}
+			catch (Exception)
+			{
+				// ignored
+			}
 		}
+	}
+
+	private class Chapter
+	{
+		public string Title { get; set; }
+		public TimeSpan Start { get; set; }
+		public TimeSpan End { get; set; }
 	}
 
 	private class SimilarRange
