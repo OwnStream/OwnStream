@@ -12,6 +12,7 @@ namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/manage/users/"), EnableCors("Api"),
  Authorize(Roles = nameof(UserPermissions.ReadAllUsers))]
+// TODO: Rework requests/responses here
 public class UsersController(DatabaseContext db) : Controller
 {
 	[HttpGet("list")]

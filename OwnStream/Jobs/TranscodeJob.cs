@@ -381,6 +381,7 @@ public class TranscodeJob : IJob
 		job.ProgressMax = null;
 		job.Message = "Moving the video file to the library";
 		await db.SaveChangesAsync(cancellationToken);
+		long size = 0;
 		List<FileInfo> fileList = [];
 		fileList.AddRange(tmpDir.GetDirectories().SelectMany(x => x.GetFiles()));
 		fileList.AddRange(tmpDir.GetFiles());
@@ -389,6 +390,7 @@ public class TranscodeJob : IJob
 		for (int i = 0; i < fileList.Count; i++)
 		{
 			FileInfo fileInfo = fileList[i];
+			size += fileInfo.Length;
 			string targetPath = fileInfo.FullName.Replace(tmpDir.FullName, job.OutputPath);
 			string? dir = Path.GetDirectoryName(targetPath);
 			if (dir != null && !Directory.Exists(dir))
@@ -415,7 +417,8 @@ public class TranscodeJob : IJob
 			Fps = (int)Math.Round(bestVideoStream.Framerate),
 			Length = (int)Math.Round(bestVideoStream.Duration.TotalMilliseconds),
 			Language = lang,
-			LibraryId = args.LibraryId
+			LibraryId = args.LibraryId,
+			Size = size
 		};
 		db.Videos.Add(dbVideo);
 		job.RelevantVideoId = args.VideoId;

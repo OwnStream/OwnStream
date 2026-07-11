@@ -5,12 +5,14 @@ using OwnStream.ApiModels.Requests;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Jobs;
+using OwnStream.Services;
 
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/manage/libraries/"), EnableCors("Api"),
  Authorize(Roles = nameof(UserPermissions.WriteLibraries))]
-public class LibrariesController(DatabaseContext db) : Controller
+public class LibrariesController(DatabaseContext db, IFfmpegJobQueueService queueService) : Controller
 {
 	[HttpGet("list")]
 	public IEnumerable<Library> ListLibraries() => db.Libraries.Select(x => new Library(x));
@@ -69,6 +71,24 @@ public class LibrariesController(DatabaseContext db) : Controller
 
 		db.Libraries.Remove(library);
 		db.SaveChanges();
+		return new SuccessResponse(true);
+	}
+
+	[HttpPost("{id:guid}/recalculateSize")]
+	public SuccessResponse RecalculateLibrarySize(Guid id)
+	{
+		DatabaseLibrary? library = db.Libraries.Find(id);
+		if (library == null)
+		{
+			Response.StatusCode = 404;
+			return new SuccessResponse(false, $"Library with ID {id} not found.");
+		}
+
+		queueService.EnqueueAsync("RecalculateVideoSizes", "", "", new RecalculateVideoSizesJob.Arguments
+		{
+			LibraryId = library.Id,
+		});
+
 		return new SuccessResponse(true);
 	}
 

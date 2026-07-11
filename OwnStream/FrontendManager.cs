@@ -26,6 +26,12 @@ public class FrontendManager(ILogger<FrontendManager> logger)
 				return await InstallFrontendFromGithubReleases(sourceUri);
 			}
 
+			case "file":
+			{
+				logger.LogInformation("Using local frontend source at {Path}", sourceUri.AbsolutePath);
+				return sourceUri.AbsolutePath;
+			}
+
 			default:
 			{
 				logger.LogCritical("Unknown frontend source: {Source}, a web frontend will not be available.", source);

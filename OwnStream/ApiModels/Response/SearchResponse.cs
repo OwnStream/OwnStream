@@ -1,5 +1,6 @@
 namespace OwnStream.ApiModels.Response;
 
+[Obsolete("just replace with PagedResponse")]
 public class SearchResponse
 {
 	public SearchResult[] Results { get; set; }

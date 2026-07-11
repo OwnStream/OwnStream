@@ -13,6 +13,7 @@ public class DatabaseVideo
 	public int Fps { get; set; }
 	public int Length { get; set; }
 	public string Language { get; set; }
+	public long Size { get; set; }
 	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
 	public ICollection<DatabaseVideoSegment> VideoSegments { get; } = new List<DatabaseVideoSegment>();
 }
