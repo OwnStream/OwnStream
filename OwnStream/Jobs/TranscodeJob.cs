@@ -128,6 +128,20 @@ public class TranscodeJob : IJob
 						continue;
 				}
 			}
+			
+			// DISCLAIMER: The 8 lines below are an AI generated "fix". I have no clue if
+			// it actually does what it says or if its just a hallucination.
+			// - kuylar
+			// -----------------------------------------------------------------------------------
+			// MSE-based players (HLS.js, Shaka) require the 'hvc1' sample entry for HEVC in fMP4;
+			// FFmpeg defaults to 'hev1', which browsers reject.
+			if (codec.Contains("hevc", StringComparison.OrdinalIgnoreCase) ||
+			    codec.Contains("265", StringComparison.OrdinalIgnoreCase))
+				mapArgs.Add("-tag:v hvc1");
+			// NVENC emits non-IDR keyframes by default, breaking 'independent_segments'.
+			if (codec.EndsWith("_nvenc", StringComparison.OrdinalIgnoreCase))
+				mapArgs.Add("-forced-idr 1");
+			// END OF AI CODE --------------------------------------------------------------------
 
 			mapArgs.Add($"-b:v {res.Bitrate}");
 			mapArgs.Add($"-c:v {codec}");
