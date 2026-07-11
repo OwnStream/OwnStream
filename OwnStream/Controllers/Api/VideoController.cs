@@ -39,6 +39,37 @@ public class VideoController(DatabaseContext db) : Controller
 		};
 	}
 
+	[HttpDelete("{id:guid}"), Authorize(Roles = nameof(UserPermissions.WriteVideos))]
+	public SuccessResponse DeleteVideo(Guid id, bool deleteEpisode = false)
+	{
+		DatabaseVideo? video = db.Videos
+			.Include(x => x.Library)
+			.Include(x => x.VideoSegments)
+			.FirstOrDefault(x => x.Id == id);
+
+		if (video == null)
+		{
+			Response.StatusCode = 404;
+			return new SuccessResponse(false, $"Video with ID {id} not found");
+		}
+
+		DirectoryInfo dir = new(Path.Join(video.Library.Path, video.Id.ToString()));
+		dir.Delete(true);
+
+		if (deleteEpisode)
+		{
+			DatabaseEpisode? ep = db.Episode
+				.Include(x => x.ParentContent)
+				.FirstOrDefault(x => x.Id == video.EpisodeId);
+			if (ep != null) db.Episode.Remove(ep);
+		}
+
+		db.Videos.Remove(video);
+		db.SaveChanges();
+
+		return new SuccessResponse(true);
+	}
+
 	[HttpGet("orphaned"), Authorize(Roles = nameof(UserPermissions.Admin))]
 	public IEnumerable<Video> GetOrphaned()
 	{
