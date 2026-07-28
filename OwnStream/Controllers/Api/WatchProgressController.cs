@@ -116,6 +116,12 @@ public class WatchProgressController(DatabaseContext db) : Controller
 			DatabaseEpisode? episode = db.Episode
 				.Include(x => x.Videos)
 				.FirstOrDefault(x => x.ParentContentId == id);
+			if (episode == null)
+			{
+				Response.StatusCode = 404;
+				return null;
+			}
+
 			DatabaseWatchProgress movieWatchProgress = db.WatchProgress
 				.Include(x => x.Episode)
 				.ThenInclude(x => x!.Videos)
