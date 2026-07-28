@@ -70,10 +70,8 @@ public class FetchMetadataJob : IJob
 		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId,
 			cancellationToken);
 
-		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId))
-			SetExternalId(content, "imdb", pImdbId);
-		if (args.ProviderIds.TryGetValue("tmdb", out string? pTmdbId) && int.TryParse(pTmdbId, out int iTmdbId))
-			SetExternalId(content, "tmdb", iTmdbId.ToString());
+		foreach ((string providerId, string externalId) in args.ProviderIds) 
+			SetExternalId(content, providerId, externalId);
 
 		content.Title = tmdbMovie?.OriginalTitle ?? tmdbMovie?.Title ?? "Missing title";
 		content.Tagline = tmdbMovie?.Tagline ?? "";
@@ -135,14 +133,8 @@ public class FetchMetadataJob : IJob
 
 		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId,
 			cancellationToken);
-		if (args.ProviderIds.TryGetValue("imdb", out string? pImdbId))
-			SetExternalId(content, "imdb", pImdbId);
-		if (args.ProviderIds.TryGetValue("tmdb", out string? pTmdbId) && int.TryParse(pTmdbId, out int iTmdbId))
-			SetExternalId(content, "tmdb", iTmdbId.ToString());
-		if (args.ProviderIds.TryGetValue("tvdb", out string? pTvdbId) && int.TryParse(pTvdbId, out int iTvdbId))
-			SetExternalId(content, "tvdb", iTvdbId.ToString());
-		if (args.ProviderIds.TryGetValue("tvMaze", out string? pTvMazeId) && int.TryParse(pTvMazeId, out int iTvMazeId))
-			SetExternalId(content, "tvMaze", iTvMazeId.ToString());
+		foreach ((string providerId, string externalId) in args.ProviderIds) 
+			SetExternalId(content, providerId, externalId);
 
 		content.Title = tmdbShow?.OriginalName ?? tmdbShow?.Name ?? "Missing title";
 		content.Tagline = tmdbShow?.Tagline ?? "";
