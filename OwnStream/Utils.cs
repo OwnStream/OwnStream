@@ -86,4 +86,17 @@ public static class Utils
 				select permission.ToString()
 			).ToArray();
 	}
+	
+	public static string RemoveInvalidFileNameChars(this string? fileName, char? replaceChar = '_')
+	{
+		if (fileName == null) return "";
+		foreach (char c in Path.GetInvalidFileNameChars())
+		{
+			fileName = fileName.Replace(c.ToString(), replaceChar?.ToString() ?? "");
+		}
+
+		// for some reason (at least on linux) " is not an invalid file name char
+		// i mean it probably is valid but it breaks stuff so im testing it here too
+		return fileName.Replace("\"", replaceChar?.ToString() ?? "");
+	}
 }

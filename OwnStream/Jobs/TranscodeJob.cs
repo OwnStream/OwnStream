@@ -128,7 +128,7 @@ public class TranscodeJob : IJob
 						continue;
 				}
 			}
-			
+
 			// DISCLAIMER: The 8 lines below are an AI generated "fix". I have no clue if
 			// it actually does what it says or if its just a hallucination.
 			// - kuylar
@@ -169,7 +169,8 @@ public class TranscodeJob : IJob
 			foreach (TranscodeConfiguration.AudioPreset res in config.Transcode.AudioPresets)
 			{
 				if (res.Channels > audio.Channels) continue;
-				string key = $"a-{res.Codec}_{res.Bitrate}_{res.Channels}-{audio.Index}-{audio.Language}-{audio.Title}";
+				string key =
+					$"a-{res.Codec}_{res.Bitrate}_{res.Channels}-{audio.Index}-{audio.Language}-{audio.Title.RemoveInvalidFileNameChars(null)}";
 				int audioIndex = audioStreams.Count;
 				complexFilter.Add($"[0:{audio.Index}]anull[{key}]");
 				mapArgs.Add($"-map \"[{key}]\"");
@@ -265,7 +266,8 @@ public class TranscodeJob : IJob
 			await db.SaveChangesAsync(cancellationToken);
 
 			StringBuilder name = new();
-			name.Append(subtitle.Language).Append('.').Append(subtitle.Title ?? subtitle.Language);
+			name.Append(subtitle.Language).Append('.')
+				.Append(subtitle.Title?.RemoveInvalidFileNameChars() ?? subtitle.Language);
 			if (subtitle.Forced > 0) name.Append(".forced");
 			if (subtitle.Default > 0) name.Append(".default");
 			name.Append($".{subtitle.Index}");
