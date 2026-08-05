@@ -41,7 +41,11 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 		["av1_vulkan"] = "AV1 (Vulkan)",
 	};
 
+	private const string MediaUrl =
+		"https://github.com/OwnStream/.github/raw/refs/heads/main/assets/benchmark/bbb_480p_10s_h264.mp4";
+
 	private static bool benchmarkRunning = false;
+	private static readonly HttpClient Client = new();
 
 	[HttpGet("get"), Authorize(Roles = nameof(UserPermissions.ReadSettings))]
 	public IActionResult Get()
@@ -71,12 +75,22 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 		benchmarkRunning = true;
 		await EventStreamOut("encoders", encoders);
 		await EventStreamOut("results", results);
+		
+		await EventStreamOut("downloadStart", new object {});
+		Stream streamAsync = await Client.GetStreamAsync(MediaUrl);
+		string path = Path.GetTempFileName();
+		await using (FileStream fileStream = new(path, FileMode.Create))
+		{
+			await streamAsync.CopyToAsync(fileStream);
+		}
+		await EventStreamOut("downloadFinish", new object {});
+
 		foreach ((string encoder, string label) in encoders)
 		{
 			if (HttpContext.RequestAborted.IsCancellationRequested) break;
 			await EventStreamOut("state", new { encoder, state = "RUNNING" });
 			long time = await ExecuteBenchmark(
-				"/home/kuylar/bbb_480p_30s_h264.mp4",
+				path,
 				encoder,
 				HttpContext.RequestAborted);
 			results[encoder] = time;
@@ -85,6 +99,7 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 		} 
 		await EventStreamOut("results", results);
 		await EventStreamOut("done", "[DONE]");
+		System.IO.File.Delete(path);
 		benchmarkRunning = false;
 	}
 
