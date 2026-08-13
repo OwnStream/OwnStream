@@ -11,6 +11,8 @@ public class TranscodeConfiguration
 
 	public List<AudioPreset> AudioPresets { get; set; } = [];
 	public List<string> AudioLanguages { get; set; } = [];
+	public List<string> SubtitleLanguages { get; set; } = [];
+	public bool CopyFileToTmp { get; set; } = false;
 	public PixFmtHandling PixelFormatHandling { get; set; } = PixFmtHandling.DownsampleAlways;
 
 	public class AudioPreset

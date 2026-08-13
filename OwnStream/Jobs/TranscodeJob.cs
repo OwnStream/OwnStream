@@ -29,10 +29,21 @@ public class TranscodeJob : IJob
 		DatabaseFfmpegJob? job = await db.FfmpegJobs.FindAsync([jobId], cancellationToken: cancellationToken);
 		if (job == null) throw new Exception($"Job with ID {jobId} not found");
 		job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-		job.Message = "Reading file...";
+		job.Message = "Initializing...";
 		await db.SaveChangesAsync(cancellationToken);
 
-		IMediaInfo media = await FFmpeg.GetMediaInfo(job.InputPath, cancellationToken);
+		string inputFile = job.InputPath;
+		if (config.Transcode.CopyFileToTmp)
+		{
+			job.Message = "Copying file to a temporary folder...";
+			await db.SaveChangesAsync(cancellationToken);
+			inputFile = Path.Join(Path.GetTempPath(), "os_transcode_tmp_" + Path.GetFileName(job.InputPath));
+			File.Copy(job.InputPath, inputFile);
+		}
+
+		job.Message = "Reading file...";
+		await db.SaveChangesAsync(cancellationToken);
+		IMediaInfo media = await FFmpeg.GetMediaInfo(inputFile, cancellationToken);
 		Conversion conv = new();
 		Arguments? args = JsonSerializer.Deserialize<Arguments>(job.Arguments);
 		if (args == null) throw new Exception("Invalid arguments");
@@ -62,7 +73,7 @@ public class TranscodeJob : IJob
 		IVideoStream video = media.VideoStreams.First();
 		List<EncodedVideo> videoStreams = [];
 		List<EncodedAudio> audioStreams = [];
-		conv.AddParameter($"-i \"{job.InputPath}\"");
+		conv.AddParameter($"-i \"{inputFile}\"");
 
 		int gVal = (int)Math.Round(video.Framerate * 2);
 
@@ -260,6 +271,10 @@ public class TranscodeJob : IJob
 		for (int i = 0; i < subtitles.Length; i++)
 		{
 			ISubtitleStream subtitle = subtitles[i];
+			if (config.Transcode.SubtitleLanguages.Count > 0 &&
+			    !config.Transcode.SubtitleLanguages.Contains(subtitle.Language) &&
+			    subtitle.Language != "und" &&
+			    !string.IsNullOrEmpty(subtitle.Language)) continue;
 			job.Message = $"Extracting subtitles {i + 1}/{subtitles.Length}";
 			job.Progress = i;
 			job.ProgressMax = subtitles.Length;
@@ -304,7 +319,7 @@ public class TranscodeJob : IJob
 		}
 
 		JsonObject probeRes = JsonSerializer.Deserialize<JsonObject>(await new Probe().Start(
-			$"-v quiet -show_chapters -show_streams -select_streams t -of json \"{job.InputPath}\"",
+			$"-v quiet -show_chapters -show_streams -select_streams t -of json \"{inputFile}\"",
 			cancellationToken))!;
 		JsonArray streams = probeRes["streams"]?.AsArray() ?? [];
 		JsonArray chapters = probeRes["chapters"]?.AsArray() ?? [];
@@ -324,7 +339,7 @@ public class TranscodeJob : IJob
 					Conversion dumpConv = new();
 					dumpConv.AddParameter(
 						$"-dump_attachment:{stream["index"]!.GetValue<int>()} \"{Path.Join(attachmentsDir.FullName, filename)}\"");
-					dumpConv.AddParameter($"-i \"{job.InputPath}\"");
+					dumpConv.AddParameter($"-i \"{inputFile}\"");
 					await dumpConv.Start(cancellationToken);
 				}
 				catch (Exception)
@@ -415,6 +430,11 @@ public class TranscodeJob : IJob
 			job.Progress = i + 1;
 			await db.SaveChangesAsync(cancellationToken);
 		}
+		job.Message = "Deleting temporary directory structure";
+		await db.SaveChangesAsync(cancellationToken);
+		foreach (DirectoryInfo dir in tmpDir.GetDirectories()) 
+			dir.Delete();
+		tmpDir.Delete();
 
 		job.Message = "Verifying video...";
 		await db.SaveChangesAsync(cancellationToken);
@@ -448,6 +468,18 @@ public class TranscodeJob : IJob
 			catch (Exception e)
 			{
 				job.Message = $"Transcoding complete, but failed to delete the input file ({e.Message})";
+			}
+		}
+		
+		if (config.Transcode.CopyFileToTmp)
+		{
+			try
+			{
+				File.Delete(inputFile);
+			}
+			catch (Exception e)
+			{
+				job.Message = $"Transcoding complete, but failed to delete the temporary file ({e.Message})";
 			}
 		}
 
