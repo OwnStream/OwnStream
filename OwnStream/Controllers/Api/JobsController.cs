@@ -17,8 +17,18 @@ public class JobsController(DatabaseContext db, JobCancellationService jobCancel
 	{
 		DateTimeOffset lastUpdated = DateTimeOffset.FromUnixTimeMilliseconds(delta);
 		IQueryable<DatabaseFfmpegJob> query = db.FfmpegJobs
-			.OrderByDescending(x => x.UpdatedAt)
-			.Where(x => x.UpdatedAt > lastUpdated);
+			.Where(x => x.UpdatedAt > lastUpdated)
+			.OrderBy(x => x.Status == DatabaseFfmpegJob.JobStatus.Starting ? 0 :
+				x.Status == DatabaseFfmpegJob.JobStatus.Processing ? 1 :
+				x.Status == DatabaseFfmpegJob.JobStatus.Failed ? 2 :
+				x.Status == DatabaseFfmpegJob.JobStatus.Pending ? 3 :
+				x.Status == DatabaseFfmpegJob.JobStatus.Completed ? 4 : 5)
+			.ThenBy(x => x.Status == DatabaseFfmpegJob.JobStatus.Pending
+				? x.UpdatedAt ?? x.CreatedAt
+				: DateTimeOffset.MaxValue)
+			.ThenByDescending(x => x.Status != DatabaseFfmpegJob.JobStatus.Pending
+				? x.UpdatedAt ?? x.CreatedAt
+				: DateTimeOffset.MinValue);
 		int count = query.Count();
 		int pages = (int)Math.Ceiling(count / (float)limit);
 		return new PagedResponse<Job>
