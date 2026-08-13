@@ -99,7 +99,7 @@ public class TranscodeJob : IJob
 
 			int videoIndex = videoStreams.Count;
 			if (videoIndex >= config.Transcode.MaxVideoStreams) continue;
-			string key = "v_" + res.Name;
+			string key = "v_" + res.Name.RemoveInvalidFileNameChars(null);
 			string codec = res.Codec;
 			complexFilter.Add($"[0:v]scale={res.Width}:-2[{key}]");
 			mapArgs.Add($"-map \"[{key}]\"");
