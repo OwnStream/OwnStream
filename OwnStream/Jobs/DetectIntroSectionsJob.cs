@@ -63,6 +63,7 @@ public class DetectIntroSectionsJob : IJob
 
 		OtherEpisode[] seasonEpisodes = thisVideo.Episode?.ParentContent.Episodes
 			.Where(x => x.Season == thisVideo.Episode?.Season)
+			.Where(x => x.Videos.Any())
 			.Select(x => new OtherEpisode
 			{
 				VideoId = x.Videos.First().Id,
