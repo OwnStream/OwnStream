@@ -38,6 +38,7 @@ public class TranscodeJob : IJob
 			job.Message = "Copying file to a temporary folder...";
 			await db.SaveChangesAsync(cancellationToken);
 			inputFile = Path.Join(Path.GetTempPath(), "os_transcode_tmp_" + Path.GetFileName(job.InputPath));
+			if (File.Exists(inputFile)) File.Delete(inputFile);
 			File.Copy(job.InputPath, inputFile);
 		}
 
