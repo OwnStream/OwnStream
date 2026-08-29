@@ -12,7 +12,7 @@ namespace OwnStream.Jobs;
 public class DetectIntroSectionsJob : IJob
 {
 	private DatabaseContext db = null!;
-	private const string FingerprintsFileName = "fingerprints.fp";
+	public const string FingerprintsFileName = "fingerprints.fp";
 	private const string ChaptersFileName = "chapters.vtt";
 
 	// TODO: Make configurable
@@ -38,7 +38,7 @@ public class DetectIntroSectionsJob : IJob
 		string fingerprintsPath = Path.Join(job.OutputPath, FingerprintsFileName);
 		string chaptersPath = Path.Join(job.OutputPath, ChaptersFileName);
 		if (!File.Exists(fingerprintsPath))
-			await GenerateFingerprints(job, fingerprintsPath, cancellationToken);
+			await GenerateFingerprints(job, db, fingerprintsPath, cancellationToken);
 
 		job.Message = "Loading other episodes...";
 		await db.SaveChangesAsync(cancellationToken);
@@ -153,7 +153,7 @@ public class DetectIntroSectionsJob : IJob
 		job.Message = "Complete";
 	}
 
-	private async Task GenerateFingerprints(DatabaseFfmpegJob job, string outputDir,
+	public static async Task GenerateFingerprints(DatabaseFfmpegJob job, DatabaseContext db, string outputDir,
 		CancellationToken cancellationToken)
 	{
 		job.Message = "Calculating fingerprints...";
