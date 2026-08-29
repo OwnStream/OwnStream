@@ -339,7 +339,7 @@ public class TranscodeJob : IJob
 					await db.SaveChangesAsync(cancellationToken);
 					Conversion dumpConv = new();
 					dumpConv.AddParameter(
-						$"-dump_attachment:{stream["index"]!.GetValue<int>()} \"{Path.Join(attachmentsDir.FullName, filename)}\"");
+						$"-dump_attachment:{stream["index"]!.GetValue<int>()} \"{Path.Join(attachmentsDir.FullName, filename)}\" -y");
 					dumpConv.AddParameter($"-i \"{inputFile}\"");
 					await dumpConv.Start(cancellationToken);
 				}
