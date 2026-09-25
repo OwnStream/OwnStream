@@ -249,12 +249,21 @@ public class TranscodeJob : IJob
 		string previewsDir = Path.Join(tmpDir.FullName, "trickplay");
 		Directory.CreateDirectory(previewsDir);
 		string[] imageFiles = Directory.GetFiles(imagesDir);
+		bool gotSmallPreview = false;
 		foreach (string name in imageFiles)
 		{
 			FileInfo f = new(name);
 			if (f.Name.StartsWith("preview_small_"))
 			{
-				f.MoveTo(Path.Join(previewsDir, "small.png"));
+				if (!gotSmallPreview)
+				{
+					f.MoveTo(Path.Join(previewsDir, "small.png"));
+					gotSmallPreview = true;
+				}
+				else
+				{
+					f.Delete();
+				}
 			}
 			else if (f.Name.StartsWith("preview_medium_"))
 			{
