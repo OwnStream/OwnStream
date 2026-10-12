@@ -44,13 +44,6 @@ public class FetchMetadataJob : IJob
 			_ => job.Message
 		};
 
-		// Fill in relevant fields for the job if they're null
-		job.RelevantVideoId ??= args.VideoId;
-		job.RelevantContentId ??= updatedItems.Content.Id;
-		job.RelevantLibraryId ??= updatedItems.Content.LibraryId;
-		if (updatedItems.Episode != null)
-			job.RelevantEpisodeId ??= updatedItems.Episode?.Id;
-
 		await db.SaveChangesAsync(cancellationToken);
 	}
 

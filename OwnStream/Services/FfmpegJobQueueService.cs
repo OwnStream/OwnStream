@@ -46,11 +46,6 @@ public class FfmpegJobQueueService(IServiceScopeFactory scopeFactory) : IFfmpegJ
 			Arguments = JsonSerializer.Serialize(arguments),
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
 			CreatedAt = DateTime.UtcNow,
-			RelevantVideoId = relevantVideoId,
-			RelevantEpisodeId = relevantEpisodeId,
-			RelevantContentId = relevantContentId,
-			RelevantLibraryId = relevantLibraryId,
-			RelevantWebhookId = relevantWebhookId
 		};
 
 		db.FfmpegJobs.Add(job);

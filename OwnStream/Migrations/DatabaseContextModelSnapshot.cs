@@ -18,7 +18,7 @@ namespace OwnStream.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -203,21 +203,6 @@ namespace OwnStream.Migrations
                     b.Property<int?>("ProgressMax")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("RelevantContentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RelevantEpisodeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RelevantLibraryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RelevantVideoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RelevantWebhookId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -228,16 +213,6 @@ namespace OwnStream.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RelevantContentId");
-
-                    b.HasIndex("RelevantEpisodeId");
-
-                    b.HasIndex("RelevantLibraryId");
-
-                    b.HasIndex("RelevantVideoId");
-
-                    b.HasIndex("RelevantWebhookId");
 
                     b.ToTable("FfmpegJobs");
                 });
@@ -486,44 +461,6 @@ namespace OwnStream.Migrations
                         .IsRequired();
 
                     b.Navigation("ParentContent");
-                });
-
-            modelBuilder.Entity("OwnStream.Database.Models.DatabaseFfmpegJob", b =>
-                {
-                    b.HasOne("OwnStream.Database.Models.DatabaseContent", "RelevantContent")
-                        .WithMany()
-                        .HasForeignKey("RelevantContentId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("OwnStream.Database.Models.DatabaseEpisode", "RelevantEpisode")
-                        .WithMany()
-                        .HasForeignKey("RelevantEpisodeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("OwnStream.Database.Models.DatabaseLibrary", "RelevantLibrary")
-                        .WithMany()
-                        .HasForeignKey("RelevantLibraryId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("OwnStream.Database.Models.DatabaseVideo", "RelevantVideo")
-                        .WithMany()
-                        .HasForeignKey("RelevantVideoId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("OwnStream.Database.Models.DatabaseWebhook", "RelevantWebhook")
-                        .WithMany()
-                        .HasForeignKey("RelevantWebhookId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("RelevantContent");
-
-                    b.Navigation("RelevantEpisode");
-
-                    b.Navigation("RelevantLibrary");
-
-                    b.Navigation("RelevantVideo");
-
-                    b.Navigation("RelevantWebhook");
                 });
 
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseInputLibrary", b =>

@@ -55,12 +55,6 @@ public class DetectIntroSectionsJob : IJob
 
 		if (thisVideo == null) throw new Exception("Video not in the database?");
 
-		// Fill in relevant fields for the job if they're null
-		job.RelevantVideoId ??= args.VideoId;
-		job.RelevantEpisodeId ??= thisVideo.EpisodeId;
-		job.RelevantContentId ??= thisVideo.Episode?.ParentContentId;
-		job.RelevantLibraryId ??= thisVideo.LibraryId;
-
 		OtherEpisode[] seasonEpisodes = thisVideo.Episode?.ParentContent.Episodes
 			.Where(x => x.Season == thisVideo.Episode?.Season)
 			.Where(x => x.Videos.Any())

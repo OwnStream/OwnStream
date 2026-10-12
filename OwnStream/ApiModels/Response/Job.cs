@@ -14,9 +14,4 @@ public class Job(DatabaseFfmpegJob job)
 	public DateTimeOffset? StartedAt { get; set; }= job.StartedAt;
 	public DateTimeOffset? UpdatedAt { get; set; }= job.UpdatedAt;
 	public DateTimeOffset? CompletedAt { get; set; }= job.CompletedAt;
-	public Guid? RelevantVideoId { get; set; }= job.RelevantVideoId;
-	public Guid? RelevantEpisodeId { get; set; }= job.RelevantEpisodeId;
-	public Guid? RelevantContentId { get; set; }= job.RelevantContentId;
-	public Guid? RelevantLibraryId { get; set; }= job.RelevantLibraryId;
-	public Guid? RelevantWebhookId { get; set; }= job.RelevantWebhookId;
 }

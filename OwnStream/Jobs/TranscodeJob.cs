@@ -500,7 +500,6 @@ public class TranscodeJob : IJob
 			Size = size
 		};
 		db.Videos.Add(dbVideo);
-		job.RelevantVideoId = args.VideoId;
 		job.Message = "Transcoding complete.";
 		if (args.DeleteAfterTranscode)
 		{
@@ -547,11 +546,6 @@ public class TranscodeJob : IJob
 				Status = DatabaseFfmpegJob.JobStatus.Pending,
 				// We want it done as soon as possible, so abuse this field to make it run right after this job
 				CreatedAt = job.CreatedAt.AddSeconds(1),
-				RelevantVideoId = job.RelevantVideoId,
-				RelevantEpisodeId = job.RelevantEpisodeId,
-				RelevantContentId = job.RelevantContentId,
-				RelevantLibraryId = job.RelevantLibraryId,
-				RelevantWebhookId = job.RelevantWebhookId,
 			};
 			db.FfmpegJobs.AddRange(metadataJob);
 		}
@@ -568,11 +562,6 @@ public class TranscodeJob : IJob
 			}),
 			Status = DatabaseFfmpegJob.JobStatus.Pending,
 			CreatedAt = DateTimeOffset.UtcNow,
-			RelevantVideoId = job.RelevantVideoId,
-			RelevantEpisodeId = job.RelevantEpisodeId,
-			RelevantContentId = job.RelevantContentId,
-			RelevantLibraryId = job.RelevantLibraryId,
-			RelevantWebhookId = job.RelevantWebhookId,
 		};
 		db.FfmpegJobs.AddRange(fingerprintsJob);
 		await db.SaveChangesAsync(cancellationToken);

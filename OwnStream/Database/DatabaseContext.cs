@@ -56,12 +56,6 @@ public class DatabaseContext : DbContext
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedTitle).HasColumnType("jsonb");
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedSummary).HasColumnType("jsonb");
 
-		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantVideo).WithMany().HasForeignKey(x => x.RelevantVideoId).OnDelete(DeleteBehavior.SetNull);
-		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantEpisode).WithMany().HasForeignKey(x => x.RelevantEpisodeId).OnDelete(DeleteBehavior.SetNull);
-		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantContent).WithMany().HasForeignKey(x => x.RelevantContentId).OnDelete(DeleteBehavior.SetNull);
-		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantLibrary).WithMany().HasForeignKey(x => x.RelevantLibraryId).OnDelete(DeleteBehavior.SetNull);
-		modelBuilder.Entity<DatabaseFfmpegJob>().HasOne(x => x.RelevantWebhook).WithMany().HasForeignKey(x => x.RelevantWebhookId).OnDelete(DeleteBehavior.SetNull);
-
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Episode).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.EpisodeId).OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Content).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.ContentId).OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Video).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.VideoId).OnDelete(DeleteBehavior.Cascade);
