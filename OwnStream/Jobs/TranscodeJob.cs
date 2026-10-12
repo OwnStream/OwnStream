@@ -218,26 +218,32 @@ public class TranscodeJob : IJob
 
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
-		bool dbLock = false;
 		int processedImages = 0;
 		IImageHash hashAlgo = new AverageHash();
 		ulong[] fingerprints = new ulong[(int)Math.Ceiling(video.Duration.TotalSeconds)];
+		SemaphoreSlim progressLock = new(1, 1);
 		conv.OnDataReceived += async (_, eventArgs) =>
 		{
-			if (dbLock) return;
-			dbLock = true;
+			if (!await progressLock.WaitAsync(0, cancellationToken))
+				return;
 
-			FileInfo[] tmpFingerprints = tmpFingerprintsDir.GetFiles();
-			int secs = tmpFingerprints.Length + processedImages;
-			double speed = (secs / DateTimeOffset.UtcNow.Subtract(job.StartedAt ?? new DateTimeOffset()).TotalSeconds);
-			job.Message = $"Transcoding at {speed:F2}x speed";
+			try
+			{
+				FileInfo[] tmpFingerprints = tmpFingerprintsDir.GetFiles();
+				int secs = tmpFingerprints.Length + processedImages;
+				double speed = (secs / DateTimeOffset.UtcNow.Subtract(job.StartedAt ?? new DateTimeOffset()).TotalSeconds);
+				job.Message = $"Transcoding at {speed:F2}x speed";
 
-			job.Progress = secs;
-			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
-			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
-			await db.SaveChangesAsync(cancellationToken);
-			processedImages += await HashFiles(tmpFingerprints, fingerprints, hashAlgo);
-			dbLock = false;
+				job.Progress = secs;
+				job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
+				job.Status = DatabaseFfmpegJob.JobStatus.Processing;
+				await db.SaveChangesAsync(cancellationToken);
+				processedImages += await HashFiles(tmpFingerprints, fingerprints, hashAlgo);
+			}
+			finally
+			{
+				progressLock.Release();
+			}
 		};
 		try
 		{
