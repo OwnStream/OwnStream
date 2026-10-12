@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CoenM.ImageHash;
+using CoenM.ImageHash.HashAlgorithms;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
@@ -217,12 +219,16 @@ public class TranscodeJob : IJob
 		job.Message = "Transcoding video...";
 		await db.SaveChangesAsync(cancellationToken);
 		bool dbLock = false;
+		int processedImages = 0;
+		IImageHash hashAlgo = new AverageHash();
+		ulong[] fingerprints = new ulong[(int)Math.Ceiling(video.Duration.TotalSeconds)];
 		conv.OnDataReceived += async (_, eventArgs) =>
 		{
 			if (dbLock) return;
 			dbLock = true;
 
-			int secs = tmpFingerprintsDir.GetFiles().Length;
+			FileInfo[] tmpFingerprints = tmpFingerprintsDir.GetFiles();
+			int secs = tmpFingerprints.Length + processedImages;
 			double speed = (secs / DateTimeOffset.UtcNow.Subtract(job.StartedAt ?? new DateTimeOffset()).TotalSeconds);
 			job.Message = $"Transcoding at {speed:F2}x speed";
 
@@ -230,6 +236,7 @@ public class TranscodeJob : IJob
 			job.ProgressMax = (int)Math.Floor(video.Duration.TotalSeconds);
 			job.Status = DatabaseFfmpegJob.JobStatus.Processing;
 			await db.SaveChangesAsync(cancellationToken);
+			processedImages += await HashFiles(tmpFingerprints, fingerprints, hashAlgo);
 			dbLock = false;
 		};
 		try
@@ -240,6 +247,25 @@ public class TranscodeJob : IJob
 		{
 			throw new Exception($"Transcode failed.\n$ ffmpeg {conv.Build().Replace(" -", " \\\n\t-")}\n{e.Message}");
 		}
+
+		job.Message = "Calculating remaining image fingerprints";
+		await db.SaveChangesAsync(cancellationToken);
+		await HashFiles(tmpFingerprintsDir.GetFiles(), fingerprints, hashAlgo);
+
+		job.Message = "Saving fingerprints...";
+		await db.SaveChangesAsync(cancellationToken);
+
+		DetectIntroSectionsJob.FingerprintFile file = new()
+		{
+			Version = 1,
+			// We don't have settings yet, just leave like this for now
+			HashSettings = [0xDE, 0xAD, 0xBE, 0xEF],
+			FrameCount = (uint)fingerprints.Length,
+			Fingerprints = fingerprints
+		};
+		await File.WriteAllBytesAsync(Path.Join(tmpDir.FullName, DetectIntroSectionsJob.FingerprintsFileName),
+			file.EncodeToBytes(), cancellationToken);
+		Directory.Delete(tmpFingerprintsDir.FullName, true);
 
 		job.ProgressMax = null;
 		job.Message = "Putting the image files in the correct places";
@@ -440,9 +466,10 @@ public class TranscodeJob : IJob
 			job.Progress = i + 1;
 			await db.SaveChangesAsync(cancellationToken);
 		}
+
 		job.Message = "Deleting temporary directory structure";
 		await db.SaveChangesAsync(cancellationToken);
-		foreach (DirectoryInfo dir in tmpDir.GetDirectories()) 
+		foreach (DirectoryInfo dir in tmpDir.GetDirectories())
 			dir.Delete();
 		tmpDir.Delete();
 
@@ -480,7 +507,7 @@ public class TranscodeJob : IJob
 				job.Message = $"Transcoding complete, but failed to delete the input file ({e.Message})";
 			}
 		}
-		
+
 		if (config.Transcode.CopyFileToTmp)
 		{
 			try
@@ -543,6 +570,24 @@ public class TranscodeJob : IJob
 		};
 		db.FfmpegJobs.AddRange(fingerprintsJob);
 		await db.SaveChangesAsync(cancellationToken);
+	}
+
+	private static async Task<int> HashFiles(FileInfo[] tmpFingerprints, ulong[] fingerprints, IImageHash hashAlgo)
+	{
+		int proc = 0;
+		foreach (FileInfo file in tmpFingerprints)
+		{
+			if (!file.Exists) continue;
+			proc++;
+			string nameWithoutExtension = Path.GetFileNameWithoutExtension(file.Name);
+			int index = int.Parse(nameWithoutExtension) - 1;
+			await using FileStream fs = File.Open(file.FullName, FileMode.Open, FileAccess.Read);
+			fingerprints[index] = hashAlgo.Hash(fs);
+			fs.Close();
+			file.Delete();
+		}
+
+		return proc;
 	}
 
 	public class Arguments
