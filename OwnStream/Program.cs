@@ -1,7 +1,5 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using OwnStream;
 using OwnStream.Database;
 using OwnStream.Database.Models;
@@ -45,7 +43,23 @@ builder.Services.AddCors(options =>
 		policyBuilder.AllowAnyMethod();
 	});
 });
-
+builder.Services.AddSwaggerGen(options =>
+{
+	options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+	{
+		Type = SecuritySchemeType.Http,
+		Description = "Token received after calling either /auth/login or /auth/remote/check",
+		Name = "Token authorization",
+		In = ParameterLocation.Header,
+		Scheme = "Bearer",
+		BearerFormat = "JWT containing user name and ID"
+	});
+	options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+	{
+		[new OpenApiSecuritySchemeReference("Bearer", document)] = []
+	});
+	options.SwaggerDoc("v1", new OpenApiInfo() { Title = "OwnStream", Version = "v1" });
+});
 WebApplication app = builder.Build();
 
 string? frontendPath = null;
@@ -127,5 +141,14 @@ if (frontendPath != null)
 	});
 else
 	Console.WriteLine("Frontend not installed properly, web app will not be available");
+if (app.Environment.IsDevelopment())
+{
+	app.UseSwagger();
+	app.UseSwaggerUI(options =>
+	{
+		options.EnableTryItOutByDefault();
+		options.SwaggerEndpoint("/swagger/v1/swagger.json", "OwnStream");
+	});
+}
 
 app.Run();

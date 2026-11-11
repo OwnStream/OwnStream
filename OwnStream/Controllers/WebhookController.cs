@@ -14,7 +14,8 @@ public class WebhookController(
 	DatabaseContext db,
 	IFfmpegJobQueueService queueService) : Controller
 {
-	[Route("/api/webhook/{id:guid}/radarr")]
+	[HttpPost("/api/webhook/{id:guid}/radarr")]
+	[Obsolete]
 	public IActionResult HandleRadarr([FromRoute] Guid id, [FromBody] RadarrWebhookBody body)
 	{
 		DatabaseWebhook? webhook = db.Webhooks.Include(x => x.Library).FirstOrDefault(x => x.Id == id);
@@ -66,7 +67,8 @@ public class WebhookController(
 		return Ok();
 	}
 
-	[Route("/api/webhook/{id:guid}/sonarr")]
+	[HttpPost("/api/webhook/{id:guid}/sonarr")]
+	[Obsolete]
 	public async Task<IActionResult> HandleSonarr([FromRoute] Guid id, [FromBody] SonarrWebhookBody body)
 	{
 		DatabaseWebhook? webhook = db.Webhooks.Include(x => x.Library).FirstOrDefault(x => x.Id == id);

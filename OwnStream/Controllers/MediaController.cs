@@ -11,8 +11,10 @@ namespace OwnStream.Controllers;
 [EnableCors("Api")]
 public class MediaController(DatabaseContext db) : Controller
 {
-	[Route("/Media/{id:guid}/{file}")]
-	[Route("/Media/{id:guid}/{folder}/{file}")]
+	[HttpGet("/Media/{id:guid}/{file}")]
+	[HttpGet("/Media/{id:guid}/{folder}/{file}")]
+	[HttpHead("/Media/{id:guid}/{file}")]
+	[HttpHead("/Media/{id:guid}/{folder}/{file}")]
 	[EnableCors("Api")]
 	public IActionResult File(Guid id, string? folder, string file, bool includeFonts = false)
 	{
@@ -92,7 +94,7 @@ public class MediaController(DatabaseContext db) : Controller
 		return NotFound();
 	}
 
-	[Route("/Media/{id:guid}/subtitles.json")]
+	[HttpGet("/Media/{id:guid}/subtitles.json")]
 	[EnableCors("Api")]
 	public IActionResult Subtitles(Guid id)
 	{
@@ -124,7 +126,7 @@ public class MediaController(DatabaseContext db) : Controller
 		return Json(subtitles);
 	}
 
-	[Route("/Media/{id:guid}/segments.json")]
+	[HttpGet("/Media/{id:guid}/segments.json")]
 	[EnableCors("Api")]
 	public IActionResult Segments(Guid id)
 	{
