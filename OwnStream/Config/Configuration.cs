@@ -7,7 +7,9 @@ public class Configuration
 {
 	[JsonIgnore]
 	public string ConfigPath => Path.Join(Utils.GetEnvironmentVariable("OWNSTREAM_DATA_PATH")!, "config.json");
-	
+
+	public string PluginsPath => Path.Join(Utils.GetEnvironmentVariable("OWNSTREAM_DATA_PATH")!, "plugins");
+
 	public TranscodeConfiguration Transcode { get; set; } = new();
 
 	public static Configuration LoadConfiguration()
@@ -21,6 +23,9 @@ public class Configuration
 		}
 
 		config ??= new Configuration();
+		if (!Directory.Exists(config.PluginsPath))
+			Directory.CreateDirectory(config.PluginsPath);
+
 		return config;
 	}
 

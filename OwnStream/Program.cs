@@ -5,6 +5,7 @@ using OwnStream.Database;
 using OwnStream.Database.Models;
 using OwnStream.Jobs;
 using OwnStream.JsonConverter;
+using OwnStream.Plugin;
 using OwnStream.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -32,6 +33,7 @@ builder.Services.AddSingleton(Configuration.LoadConfiguration());
 builder.Services.AddSingleton<JobManager>();
 builder.Services.AddSingleton<JobCancellationService>();
 builder.Services.AddSingleton<FrontendManager>();
+builder.Services.AddSingleton<PluginManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 builder.Services.AddCors(options =>
@@ -91,6 +93,9 @@ using (IServiceScope scope = app.Services.CreateScope())
 
 	FrontendManager frontendManager = scope.ServiceProvider.GetRequiredService<FrontendManager>();
 	frontendPath = await frontendManager.InstallFrontend();
+
+	PluginManager pluginManager = scope.ServiceProvider.GetRequiredService<PluginManager>();
+	pluginManager.Init();
 }
 
 if (!app.Environment.IsDevelopment())

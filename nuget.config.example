@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Used for the GitHub Package Registry to download OwnStream.PluginCore -->
+<configuration>
+    <packageSources>
+        <clear/>
+        <add key="github" value="https://nuget.pkg.github.com/OwnStream/index.json"/>
+        <add key="NuGet" value="https://api.nuget.org/v3/index.json"/>
+    </packageSources>
+    <packageSourceCredentials>
+        <github>
+            <add key="Username" value="YOUR_GITHUB_USERNAME"/>
+            <add key="ClearTextPassword" value="YOUR_PERSONAL_ACCESS_TOKEN"/>
+        </github>
+    </packageSourceCredentials>
+</configuration>
