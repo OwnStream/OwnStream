@@ -57,6 +57,7 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 	public IActionResult Update([FromBody] Configuration newConfig)
 	{
 		config.Transcode = newConfig.Transcode;
+		config.Metadata = newConfig.Metadata;
 		config.SaveConfiguration();
 		return Json(config);
 	}

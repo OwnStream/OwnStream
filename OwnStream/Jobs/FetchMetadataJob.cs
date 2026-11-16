@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Plugin;
+using OwnStream.PluginCore.ResultTypes;
 using TMDbLib.Client;
 using TMDbLib.Objects.General;
 using TMDbLib.Objects.Movies;
@@ -13,17 +15,19 @@ namespace OwnStream.Jobs;
 public class FetchMetadataJob : IJob
 {
 	private DatabaseContext db = null!;
+	private PluginManager pm = null!;
+	private Configuration config = null!;
 	private static bool providersReady = false;
-	private static TMDbClient tmdb = new("d6c3b6af61d00e36435b1912b160082f");
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
 		db = serviceProvider.GetRequiredService<DatabaseContext>();
+		pm = serviceProvider.GetRequiredService<PluginManager>();
+		config = serviceProvider.GetRequiredService<Configuration>();
 	}
 
 	public async Task ExecuteJob(Guid jobId, CancellationToken cancellationToken)
 	{
-		await PrepProviders(cancellationToken);
 		DatabaseFfmpegJob? job = await db.FfmpegJobs.FindAsync([jobId], cancellationToken: cancellationToken);
 		if (job == null) throw new Exception($"Job with ID {jobId} not found");
 		Arguments? args = JsonSerializer.Deserialize<Arguments>(job.Arguments);
@@ -47,52 +51,74 @@ public class FetchMetadataJob : IJob
 		await db.SaveChangesAsync(cancellationToken);
 	}
 
-	private async Task PrepProviders(CancellationToken cancellationToken)
-	{
-		await tmdb.GetConfigAsync();
-	}
-
 	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchMovieMetadata(DatabaseFfmpegJob job,
 		Arguments args, CancellationToken cancellationToken)
 	{
-		Movie? tmdbMovie = null;
-		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
-			tmdbMovie = await tmdb.GetMovieAsync(tmdbId, MovieMethods.Translations | MovieMethods.Images,
-				cancellationToken);
+		if (args.ProviderIds.Count == 0)
+		{
+			DatabaseContent earlyContent = GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie,
+				args.LibraryId);
+			DatabaseEpisode? earlyEpisode = args is { Episode: not null, Season: not null }
+				? await GetEpisode(earlyContent.Id, args.Season.Value, args.Episode.Value, cancellationToken)
+				: null;
+			return (earlyContent, earlyEpisode);
+		}
 
-		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId,
-			cancellationToken);
+		Dictionary<string, MetadataMovieResult> unorderedResults = [];
+		foreach ((string providerId, string id) in args.ProviderIds)
+		{
+			IEnumerable<MetadataMovieResult> results =
+				await pm.InvokeForPluginsWithPermission<MetadataMovieResult>($"metadata.provide.{providerId}",
+					"metadata.getMovie", id);
+			MetadataMovieResult? first = results.FirstOrDefault();
+			if (first == null) continue;
+			unorderedResults[providerId] = first;
+		}
 
-		foreach ((string providerId, string externalId) in args.ProviderIds) 
+		MetadataMovieResult[] orderedResults = unorderedResults.OrderBy(x =>
+		{
+			int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
+			return index != -1 ? index : int.MaxValue;
+		}).Select(x => x.Value).ToArray();
+
+		if (orderedResults.Length == 0)
+			throw new Exception("None of the providers returned a result");
+
+		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId);
+
+		// TODO: add this to plugins
+		/*
+		foreach ((string providerId, string externalId) in args.ProviderIds)
 			SetExternalId(content, providerId, externalId);
+		*/
 
-		content.Title = tmdbMovie?.OriginalTitle ?? tmdbMovie?.Title ?? "Missing title";
-		content.Tagline = tmdbMovie?.Tagline ?? "";
-		content.Description = tmdbMovie?.Overview ?? "";
-		foreach (Translation translation in tmdbMovie?.Translations?.Translations ?? [])
-		{
-			if (translation.Iso_639_1 == null || translation.Iso_3166_1 == null || translation.Data == null) continue;
-			string key = translation.Iso_639_1 + "_" + translation.Iso_3166_1;
-			if (translation.Data.Name != null && translation.Data.Name.Trim().Length > 0)
-				content.TranslatedTitle[key] = translation.Data.Name.Trim();
-			if (translation.Data.Tagline != null && translation.Data.Tagline.Trim().Length > 0)
-				content.TranslatedTagline[key] = translation.Data.Tagline.Trim();
-			if (translation.Data.Overview != null && translation.Data.Overview.Trim().Length > 0)
-				content.TranslatedDescription[key] = translation.Data.Overview.Trim();
-		}
+		content.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? content.Title;
+		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
+		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
 
-		if (tmdbMovie?.PosterPath != null)
-			content.Poster = tmdb.GetImageUrl("original", tmdbMovie.PosterPath, true).ToString();
-		if (tmdbMovie?.BackdropPath != null)
-			content.Backdrop = tmdb.GetImageUrl("original", tmdbMovie.BackdropPath, true).ToString();
-		if (tmdbMovie?.Images?.Logos?.Count > 0)
-		{
-			ImageData? logo = tmdbMovie?.Images?.Logos?.MaxBy(x => x.VoteAverage);
-			if (logo?.FilePath != null)
-				content.Logo = tmdb.GetImageUrl("original", logo.FilePath, true).ToString();
-		}
+		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
+		content.TranslatedTagline =
+			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
+		content.TranslatedDescription =
+			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
 
-		content.ReleasedAt = new DateTimeOffset(tmdbMovie?.ReleaseDate ?? DateTime.UnixEpoch).ToUniversalTime();
+		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
+		                 content.Poster;
+		content.Banner = orderedResults.CombineLists(x => x.Images?["banner"] ?? []).FirstOrDefault()?.Url ??
+		                 content.Banner;
+		content.Logo = orderedResults.CombineLists(x => x.Images?["logo"] ?? []).FirstOrDefault()?.Url ??
+		               content.Logo;
+		content.Backdrop = orderedResults.CombineLists(x => x.Images?["backdrop"] ?? []).FirstOrDefault()?.Url ??
+		                   content.Backdrop;
+		content.Thumbnail = orderedResults.CombineLists(x => x.Images?["thumbnail"] ?? []).FirstOrDefault()?.Url ??
+		                    content.Thumbnail;
+
+		content.AgeRatings = orderedResults.CombineDicts(x => x.AgeRatings ?? [], content.AgeRatings);
+
+		content.ReleasedAt =
+			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.ReleaseDate), out DateTimeOffset rDate)
+				? rDate
+				: content.ReleasedAt;
 		content.UpdatedAt = DateTimeOffset.UtcNow;
 
 		DatabaseEpisode? episode = null;
@@ -118,88 +144,118 @@ public class FetchMetadataJob : IJob
 	private async Task<(DatabaseContent content, DatabaseEpisode? episode)> FetchShowMetadata(DatabaseFfmpegJob job,
 		Arguments args, CancellationToken cancellationToken)
 	{
-		TvShow? tmdbShow = null;
-		if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbId) && int.TryParse(sTmdbId, out int tmdbId))
-			tmdbShow = await tmdb.GetTvShowAsync(tmdbId,
-				TvShowMethods.Translations | TvShowMethods.Images | TvShowMethods.ContentRatings,
-				cancellationToken: cancellationToken);
+		if (args.ProviderIds.Count == 0)
+		{
+			DatabaseContent earlyContent = GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv,
+				args.LibraryId);
+			DatabaseEpisode? earlyEpisode = args is { Episode: not null, Season: not null }
+				? await GetEpisode(earlyContent.Id, args.Season.Value, args.Episode.Value, cancellationToken)
+				: null;
+			return (earlyContent, earlyEpisode);
+		}
 
-		DatabaseContent content = await GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId,
-			cancellationToken);
-		foreach ((string providerId, string externalId) in args.ProviderIds) 
+		Dictionary<string, MetadataTvResult> unorderedResults = [];
+		foreach ((string providerId, string id) in args.ProviderIds)
+		{
+			IEnumerable<MetadataTvResult> results =
+				await pm.InvokeForPluginsWithPermission<MetadataTvResult>($"metadata.provide.{providerId}",
+					"metadata.getTv", id);
+			MetadataTvResult? first = results.FirstOrDefault();
+			if (first == null) continue;
+			unorderedResults[providerId] = first;
+		}
+
+		MetadataTvResult[] orderedResults = unorderedResults.OrderBy(x =>
+		{
+			int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
+			return index != -1 ? index : int.MaxValue;
+		}).Select(x => x.Value).ToArray();
+
+		if (orderedResults.Length == 0)
+			throw new Exception("None of the providers returned a result");
+
+		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId);
+
+		// TODO: add this to plugins
+		/*
+		foreach ((string providerId, string externalId) in args.ProviderIds)
 			SetExternalId(content, providerId, externalId);
+		*/
 
-		content.Title = tmdbShow?.OriginalName ?? tmdbShow?.Name ?? "Missing title";
-		content.Tagline = tmdbShow?.Tagline ?? "";
-		content.Description = tmdbShow?.Overview ?? "";
+		content.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? content.Title;
+		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
+		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
 
-		foreach (Translation translation in tmdbShow?.Translations?.Translations ?? [])
-		{
-			if (translation.Iso_639_1 == null || translation.Iso_3166_1 == null || translation.Data == null) continue;
-			string key = translation.Iso_639_1 + "_" + translation.Iso_3166_1;
-			if (translation.Data.Name != null && translation.Data.Name.Trim().Length > 0)
-				content.TranslatedTitle[key] = translation.Data.Name.Trim();
-			if (translation.Data.Tagline != null && translation.Data.Tagline.Trim().Length > 0)
-				content.TranslatedTagline[key] = translation.Data.Tagline.Trim();
-			if (translation.Data.Overview != null && translation.Data.Overview.Trim().Length > 0)
-				content.TranslatedDescription[key] = translation.Data.Overview.Trim();
-		}
+		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
+		content.TranslatedTagline =
+			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
+		content.TranslatedDescription =
+			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
 
-		if (tmdbShow?.PosterPath != null)
-			content.Poster = tmdb.GetImageUrl("original", tmdbShow.PosterPath, true).ToString();
-		if (tmdbShow?.BackdropPath != null)
-			content.Backdrop = tmdb.GetImageUrl("original", tmdbShow.BackdropPath, true).ToString();
-		if (tmdbShow?.Images?.Logos?.Count > 0)
-		{
-			ImageData? logo = tmdbShow?.Images?.Logos?.MaxBy(x => x.VoteAverage);
-			if (logo?.FilePath != null)
-				content.Logo = tmdb.GetImageUrl("original", logo.FilePath, true).ToString();
-		}
+		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
+		                 content.Poster;
+		content.Banner = orderedResults.CombineLists(x => x.Images?["banner"] ?? []).FirstOrDefault()?.Url ??
+		                 content.Banner;
+		content.Logo = orderedResults.CombineLists(x => x.Images?["logo"] ?? []).FirstOrDefault()?.Url ??
+		               content.Logo;
+		content.Backdrop = orderedResults.CombineLists(x => x.Images?["backdrop"] ?? []).FirstOrDefault()?.Url ??
+		                   content.Backdrop;
+		content.Thumbnail = orderedResults.CombineLists(x => x.Images?["thumbnail"] ?? []).FirstOrDefault()?.Url ??
+		                    content.Thumbnail;
 
-		content.ReleasedAt = new DateTimeOffset(tmdbShow?.FirstAirDate ?? DateTime.UnixEpoch).ToUniversalTime();
-		content.FinishedStreamingAt = tmdbShow?.LastAirDate != null
-			? new DateTimeOffset(tmdbShow.LastAirDate.Value).ToUniversalTime()
-			: null;
+		content.AgeRatings = orderedResults.CombineDicts(x => x.AgeRatings ?? [], content.AgeRatings);
+
+		content.ReleasedAt =
+			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.ReleaseDate), out DateTimeOffset rDate)
+				? rDate
+				: content.ReleasedAt;
+		content.FinishedStreamingAt =
+			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.FinishDate), out DateTimeOffset fDate)
+				? fDate
+				: content.FinishedStreamingAt;
 		content.UpdatedAt = DateTimeOffset.UtcNow;
-		foreach (ContentRating rating in tmdbShow?.ContentRatings?.Results ?? [])
-		{
-			if (rating.Iso_3166_1 == null || rating.Rating == null) continue;
-			content.AgeRatings[rating.Iso_3166_1] = rating.Rating;
-		}
 
 		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
 		{
 			episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
 
-			TvEpisode? tmdbEpisode = null;
-			if (args.ProviderIds.TryGetValue("tmdb", out string? sTmdbEId) && int.TryParse(sTmdbEId, out int tmdbIdE))
-				tmdbEpisode = await tmdb.GetTvEpisodeAsync(tmdbIdE, args.Season.Value, args.Episode.Value,
-					TvEpisodeMethods.Translations | TvEpisodeMethods.Images,
-					cancellationToken: cancellationToken);
-
-			episode.Title = tmdbEpisode?.Name ?? $"Episode {args.Episode}";
-			episode.Summary = tmdbEpisode?.Overview ?? "";
-			episode.UpdatedAt = DateTimeOffset.UtcNow;
-			episode.ReleasedAt = tmdbEpisode?.AirDate != null
-				? new DateTimeOffset(tmdbEpisode.AirDate.Value).ToUniversalTime()
-				: DateTimeOffset.UnixEpoch;
-			ImageData? firstStill = tmdbEpisode?.Images?.Stills?.FirstOrDefault();
-			if (tmdbEpisode?.StillPath != null)
-				episode.Thumbnail = tmdb.GetImageUrl("original", tmdbEpisode.StillPath, true).ToString();
-			else if (firstStill?.FilePath != null)
-				episode.Thumbnail = tmdb.GetImageUrl("original", firstStill.FilePath, true).ToString();
-
-			foreach (Translation translation in tmdbEpisode?.Translations?.Translations ?? [])
+			Dictionary<string, MetadataEpisodeResult> unorderedEpisodeResults = [];
+			foreach ((string providerId, string id) in args.ProviderIds)
 			{
-				if (translation.Iso_639_1 == null || translation.Iso_3166_1 == null ||
-				    translation.Data == null) continue;
-				string key = translation.Iso_639_1 + "_" + translation.Iso_3166_1;
-				if (translation.Data.Name != null && translation.Data.Name.Trim().Length > 0)
-					episode.TranslatedTitle[key] = translation.Data.Name.Trim();
-				if (translation.Data.Overview != null && translation.Data.Overview.Trim().Length > 0)
-					episode.TranslatedSummary[key] = translation.Data.Overview.Trim();
+				IEnumerable<MetadataEpisodeResult> results =
+					await pm.InvokeForPluginsWithPermission<MetadataEpisodeResult>($"metadata.provide.{providerId}",
+						"metadata.getTvEpisode", id, args.Season, args.Episode);
+				MetadataEpisodeResult? first = results.FirstOrDefault();
+				if (first == null) continue;
+				unorderedEpisodeResults[providerId] = first;
 			}
+
+			MetadataEpisodeResult[] orderedEpisodeResults = unorderedEpisodeResults.OrderBy(x =>
+			{
+				int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
+				return index != -1 ? index : int.MaxValue;
+			}).Select(x => x.Value).ToArray();
+
+			if (orderedEpisodeResults.Length == 0)
+				throw new Exception("None of the providers returned a result");
+
+			episode.Title = orderedEpisodeResults.FirstNonEmptyValue(x => x.Title) ?? episode.Title;
+			episode.Summary = orderedEpisodeResults.FirstNonEmptyValue(x => x.Summary) ?? episode.Summary;
+
+			episode.TranslatedTitle =
+				orderedEpisodeResults.CombineDicts(x => x.TitleTranslations ?? [], episode.TranslatedTitle);
+			episode.TranslatedSummary =
+				orderedEpisodeResults.CombineDicts(x => x.SummaryTranslations ?? [], episode.TranslatedSummary);
+
+			episode.Thumbnail = orderedEpisodeResults.CombineLists(x => x.Thumbnails ?? []).FirstOrDefault()?.Url ??
+			                    episode.Thumbnail;
+
+			episode.UpdatedAt = DateTimeOffset.UtcNow;
+			episode.ReleasedAt = Utils.TryParseIsoString(orderedEpisodeResults.FirstNonEmptyValue(x => x.ReleaseDate),
+				out DateTimeOffset erDate)
+				? erDate
+				: episode.ReleasedAt;
 
 			if (args.VideoId != null)
 			{
@@ -212,18 +268,18 @@ public class FetchMetadataJob : IJob
 		return (content, episode);
 	}
 
-	private async Task<DatabaseContent> GetContent(Dictionary<string, string> providerIds,
-		DatabaseContent.ContentType type, Guid libraryId,
-		CancellationToken cancellationToken)
+	private DatabaseContent GetContent(Dictionary<string, string> providerIds,
+		DatabaseContent.ContentType type, Guid libraryId)
 	{
-		int? tmdbId = int.TryParse(providerIds["tmdb"], out int r) ? r : null;
-		DatabaseContent? existing = await db.Content
+		DatabaseContent? existing = db.Content
 			.Include(x => x.ExternalIds)
-			.FirstOrDefaultAsync(x =>
-					x.ExternalIds.Any(c => c.ProviderId == "tmdb" && c.ExternalId == tmdbId.ToString()) &&
-					x.LibraryId == libraryId &&
-					x.Type == type,
-				cancellationToken: cancellationToken);
+			.Where(x =>
+				x.LibraryId == libraryId &&
+				x.Type == type)
+			.ToArray()
+			.FirstOrDefault(x =>
+				x.ExternalIds.Any(c => providerIds.GetValueOrDefault(c.ProviderId, "") == c.ExternalId)
+			);
 		if (existing != null) return existing;
 
 		existing = new DatabaseContent
@@ -235,6 +291,8 @@ public class FetchMetadataJob : IJob
 			UpdatedAt = DateTimeOffset.UtcNow
 		};
 		db.Content.Add(existing);
+		foreach ((string providerId, string externalId) in providerIds)
+			SetExternalId(existing, providerId, externalId);
 		return existing;
 	}
 
@@ -253,6 +311,7 @@ public class FetchMetadataJob : IJob
 			Season = season,
 			Episode = episode,
 			CreatedAt = DateTimeOffset.UtcNow,
+			ReleasedAt = DateTimeOffset.UtcNow
 		};
 		db.Episode.Add(existing);
 		return existing;

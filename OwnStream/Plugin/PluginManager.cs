@@ -101,15 +101,33 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 		_ => LogLevel.Information
 	};
 
+	public async Task<T> InvokeForPluginWithId<T>(string id, string method, params object[] args) where T : class
+	{
+		if (!plugins.TryGetValue(id, out LoadedPlugin? plugin))
+			throw new KeyNotFoundException($"Plugin not loaded: {id}");
+		return PrependPluginIdToResult(id, await plugin.InvokeFeature<T>(method, args))!;
+	}
+
 	public async Task<IEnumerable<T>> InvokeForPluginsWithPermission<T>(string permission, string method,
 		params object[] args) where T : class
 	{
 		Dictionary<string, Task<T>> tasks = plugins.Values.Where(x => x.Metadata.Permissions.Contains(permission))
+			.Where(x => x.Metadata.Features.Contains(method))
 			.ToDictionary(x =>
 				x.Metadata.Permissions.FirstOrDefault(p => p.StartsWith("metadata.provide."))?.Split('.', 3)[2] ??
 				x.Metadata.Id, x => x.InvokeFeature<T>(method, args));
-		await Task.WhenAll(tasks.Values);
-		return tasks.Select(x => PrependPluginIdToResult(x.Key, x.Value.Result)!);
+		await Task.WhenAll(tasks.Select(async t =>
+		{
+			try
+			{
+				await t.Value;
+			}
+			catch (Exception e)
+			{
+				logger.LogError(e, "[{Plugin}/{Method}] {Message}", t.Key, method, e.Message);
+			}
+		}));
+		return tasks.Select(x => PrependPluginIdToResult(x.Key, x.Value.Result)).Where(x => x != null).Cast<T>();
 	}
 
 	public async Task<IEnumerable<T>> InvokeForPluginsWithFeature<T>(string feature, params object[] args)
@@ -119,11 +137,21 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 			.ToDictionary(
 				x => x.Metadata.Permissions.FirstOrDefault(p => p.StartsWith("metadata.provide."))?.Split('.', 3)[2] ??
 				     x.Metadata.Id, x => x.InvokeFeature<T>(feature, args));
-		await Task.WhenAll(tasks.Values);
-		return tasks.Select(x => PrependPluginIdToResult(x.Key, x.Value.Result)!);
+		await Task.WhenAll(tasks.Select(async t =>
+		{
+			try
+			{
+				await t.Value;
+			}
+			catch (Exception e)
+			{
+				logger.LogError(e, "[{Plugin}/{Method}] {Message}", t.Key, feature, e.Message);
+			}
+		}));
+		return tasks.Select(x => PrependPluginIdToResult(x.Key, x.Value.Result)).Where(x => x != null).Cast<T>();
 	}
 
-	private static T? PrependPluginIdToResult<T>(string pluginId, T result) where T : class => result switch
+	private static T? PrependPluginIdToResult<T>(string pluginId, T? result) where T : class => result switch
 	{
 		MetadataSearchResult s => new MetadataSearchResult
 		{

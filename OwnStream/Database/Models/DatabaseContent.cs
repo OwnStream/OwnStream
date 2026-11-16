@@ -6,11 +6,11 @@ public class DatabaseContent
 	public Guid LibraryId { get; set; }
 	public DatabaseLibrary Library { get; set; } = null!;
 	public ContentType Type { get; set; }
-	public string Title { get; set; }
+	public string Title { get; set; } = "";
 	public Dictionary<string, string> TranslatedTitle { get; set; } = [];
-	public string Tagline { get; set; }
+	public string Tagline { get; set; } = "";
 	public Dictionary<string, string> TranslatedTagline { get; set; } = [];
-	public string Description { get; set; }
+	public string Description { get; set; } = "";
 	public Dictionary<string, string> TranslatedDescription { get; set; } = [];
 
 	public string? Poster { get; set; } = null;

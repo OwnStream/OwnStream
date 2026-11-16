@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Konscious.Security.Cryptography;
 using Microsoft.Extensions.Primitives;
@@ -86,11 +87,11 @@ public static class Utils
 				select permission.ToString()
 			).ToArray();
 	}
-	
+
 	public static string RemoveInvalidFileNameChars(this string? fileName, char? replaceChar = '_')
 	{
 		if (fileName == null) return "";
-		foreach (char c in Path.GetInvalidFileNameChars()) 
+		foreach (char c in Path.GetInvalidFileNameChars())
 			fileName = fileName.Replace(c.ToString(), replaceChar?.ToString() ?? "");
 
 		return fileName
@@ -100,5 +101,84 @@ public static class Utils
 			// https://github.com/OwnStream/OwnStream/issues/19
 			.Replace("[", replaceChar?.ToString() ?? "")
 			.Replace("]", replaceChar?.ToString() ?? "");
+	}
+
+	public static TValue? FirstNonEmptyValue<TItem, TValue>(this IEnumerable<TItem> items, Func<TItem, TValue> func,
+		StringType stringType = StringType.Default)
+	{
+		foreach (TItem item in items)
+		{
+			TValue val = func.Invoke(item);
+			switch (val)
+			{
+				case string sVal:
+					if (!string.IsNullOrWhiteSpace(sVal))
+					{
+						switch (stringType)
+						{
+							case StringType.Date:
+								if (TryParseIsoString(sVal, out DateTimeOffset _))
+									return val;
+								break;
+							default:
+								return val;
+						}
+					}
+
+					break;
+				default:
+					if (val != null)
+						return val;
+					break;
+			}
+		}
+
+		return default;
+	}
+
+	public static IEnumerable<TValue> CombineLists<TItem, TValue>(this IEnumerable<TItem>
+		items, Func<TItem, IEnumerable<TValue>> func) => items.SelectMany(func);
+
+	public static Dictionary<TKey, TValue> CombineDicts<TItem, TKey, TValue>(this IEnumerable<TItem> items,
+		Func<TItem, Dictionary<TKey, TValue>> func, Dictionary<TKey, TValue>? baseValue = null) where TKey : notnull
+	{
+		Dictionary<TKey, TValue> result = [];
+		foreach (TItem item in items)
+		{
+			Dictionary<TKey, TValue> val = func.Invoke(item);
+			foreach ((TKey key, TValue value) in val)
+				result.TryAdd(key, value);
+		}
+
+		foreach ((TKey key, TValue value) in baseValue ?? [])
+			result.TryAdd(key, value);
+
+		return result;
+	}
+
+	public enum StringType
+	{
+		Default,
+		Date
+	}
+	
+	private static readonly string[] IsoFormats = {
+		"yyyy-MM-ddTHH:mm:ss.fffffffzzz",
+		"yyyy-MM-ddTHH:mm:sszzz",
+		"yyyy-MM-ddTHH:mm:ss'Z'",
+		"yyyy-MM-ddTHH:mm:ss",
+		"yyyy-MM-dd"
+	};
+
+	public static bool TryParseIsoString(string? input, out DateTimeOffset result)
+	{
+		result = default;
+		if (input == null) return false;
+		return DateTimeOffset.TryParseExact(
+			input,
+			IsoFormats,
+			CultureInfo.InvariantCulture,
+			DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+			out result);
 	}
 }

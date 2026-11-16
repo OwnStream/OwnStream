@@ -11,6 +11,7 @@ public class Configuration
 	public string PluginsPath => Path.Join(Utils.GetEnvironmentVariable("OWNSTREAM_DATA_PATH")!, "plugins");
 
 	public TranscodeConfiguration Transcode { get; set; } = new();
+	public MetadataConfiguration Metadata { get; set; } = new();
 
 	public static Configuration LoadConfiguration()
 	{
