@@ -5,6 +5,7 @@ using OwnStream.Database;
 using OwnStream.Database.Models;
 using OwnStream.Jobs;
 using OwnStream.JsonConverter;
+using OwnStream.Metadata;
 using OwnStream.Plugin;
 using OwnStream.Services;
 
@@ -34,6 +35,7 @@ builder.Services.AddSingleton<JobManager>();
 builder.Services.AddSingleton<JobCancellationService>();
 builder.Services.AddSingleton<FrontendManager>();
 builder.Services.AddSingleton<PluginManager>();
+builder.Services.AddScoped<MetadataManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 builder.Services.AddCors(options =>
