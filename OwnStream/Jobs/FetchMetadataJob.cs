@@ -2,8 +2,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Metadata;
 using OwnStream.Plugin;
-using OwnStream.PluginCore.ResultTypes;
 
 namespace OwnStream.Jobs;
 
@@ -11,14 +11,12 @@ namespace OwnStream.Jobs;
 public class FetchMetadataJob : IJob
 {
 	private DatabaseContext db = null!;
-	private PluginManager pm = null!;
-	private Configuration config = null!;
+	private MetadataManager mm = null!;
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
 		db = serviceProvider.GetRequiredService<DatabaseContext>();
-		pm = serviceProvider.GetRequiredService<PluginManager>();
-		config = serviceProvider.GetRequiredService<Configuration>();
+		mm = serviceProvider.GetRequiredService<MetadataManager>();
 	}
 
 	public async Task ExecuteJob(Guid jobId, CancellationToken cancellationToken)
@@ -56,72 +54,19 @@ public class FetchMetadataJob : IJob
 			DatabaseEpisode? earlyEpisode = args is { Episode: not null, Season: not null }
 				? await GetEpisode(earlyContent.Id, args.Season.Value, args.Episode.Value, cancellationToken)
 				: null;
+			await db.SaveChangesAsync(cancellationToken);
 			return (earlyContent, earlyEpisode);
 		}
 
-		Dictionary<string, MetadataMovieResult> unorderedResults = [];
-		foreach ((string providerId, string id) in args.ProviderIds)
-		{
-			IEnumerable<MetadataMovieResult> results =
-				await pm.InvokeForPluginsWithPermission<MetadataMovieResult>($"metadata.provide.{providerId}",
-					"metadata.getMovie", id);
-			MetadataMovieResult? first = results.FirstOrDefault();
-			if (first == null) continue;
-			unorderedResults[providerId] = first;
-		}
-
-		MetadataMovieResult[] orderedResults = unorderedResults.OrderBy(x =>
-		{
-			int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
-			return index != -1 ? index : int.MaxValue;
-		}).Select(x => x.Value).ToArray();
-
-		if (orderedResults.Length == 0)
-			throw new Exception("None of the providers returned a result");
-
 		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId);
-
-		// TODO: add this to plugins
-		/*
-		foreach ((string providerId, string externalId) in args.ProviderIds)
-			SetExternalId(content, providerId, externalId);
-		*/
-
-		content.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? content.Title;
-		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
-		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
-
-		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
-		content.TranslatedTagline =
-			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
-		content.TranslatedDescription =
-			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
-
-		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
-		                 content.Poster;
-		content.Banner = orderedResults.CombineLists(x => x.Images?["banner"] ?? []).FirstOrDefault()?.Url ??
-		                 content.Banner;
-		content.Logo = orderedResults.CombineLists(x => x.Images?["logo"] ?? []).FirstOrDefault()?.Url ??
-		               content.Logo;
-		content.Backdrop = orderedResults.CombineLists(x => x.Images?["backdrop"] ?? []).FirstOrDefault()?.Url ??
-		                   content.Backdrop;
-		content.Thumbnail = orderedResults.CombineLists(x => x.Images?["thumbnail"] ?? []).FirstOrDefault()?.Url ??
-		                    content.Thumbnail;
-
-		content.AgeRatings = orderedResults.CombineDicts(x => x.AgeRatings ?? [], content.AgeRatings);
-
-		content.ReleasedAt =
-			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.ReleaseDate), out DateTimeOffset rDate)
-				? rDate
-				: content.ReleasedAt;
-		content.UpdatedAt = DateTimeOffset.UtcNow;
+		await mm.RefreshMetadataOf(content, args.ProviderIds);
 
 		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
 		{
 			episode = await GetEpisode(content.Id, 1, 1, cancellationToken);
-			episode.Title = "movie";
-			episode.Summary = "movie";
+			episode.Title = content.Title;
+			episode.Summary = "";
 			episode.UpdatedAt = DateTimeOffset.UtcNow;
 			episode.ReleasedAt = content.ReleasedAt;
 
@@ -146,111 +91,19 @@ public class FetchMetadataJob : IJob
 			DatabaseEpisode? earlyEpisode = args is { Episode: not null, Season: not null }
 				? await GetEpisode(earlyContent.Id, args.Season.Value, args.Episode.Value, cancellationToken)
 				: null;
+			await db.SaveChangesAsync(cancellationToken);
 			return (earlyContent, earlyEpisode);
 		}
 
-		Dictionary<string, MetadataTvResult> unorderedResults = [];
-		foreach ((string providerId, string id) in args.ProviderIds)
-		{
-			IEnumerable<MetadataTvResult> results =
-				await pm.InvokeForPluginsWithPermission<MetadataTvResult>($"metadata.provide.{providerId}",
-					"metadata.getTv", id);
-			MetadataTvResult? first = results.FirstOrDefault();
-			if (first == null) continue;
-			unorderedResults[providerId] = first;
-		}
-
-		MetadataTvResult[] orderedResults = unorderedResults.OrderBy(x =>
-		{
-			int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
-			return index != -1 ? index : int.MaxValue;
-		}).Select(x => x.Value).ToArray();
-
-		if (orderedResults.Length == 0)
-			throw new Exception("None of the providers returned a result");
-
 		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId);
-
-		// TODO: add this to plugins
-		/*
-		foreach ((string providerId, string externalId) in args.ProviderIds)
-			SetExternalId(content, providerId, externalId);
-		*/
-
-		content.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? content.Title;
-		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
-		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
-
-		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
-		content.TranslatedTagline =
-			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
-		content.TranslatedDescription =
-			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
-
-		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
-		                 content.Poster;
-		content.Banner = orderedResults.CombineLists(x => x.Images?["banner"] ?? []).FirstOrDefault()?.Url ??
-		                 content.Banner;
-		content.Logo = orderedResults.CombineLists(x => x.Images?["logo"] ?? []).FirstOrDefault()?.Url ??
-		               content.Logo;
-		content.Backdrop = orderedResults.CombineLists(x => x.Images?["backdrop"] ?? []).FirstOrDefault()?.Url ??
-		                   content.Backdrop;
-		content.Thumbnail = orderedResults.CombineLists(x => x.Images?["thumbnail"] ?? []).FirstOrDefault()?.Url ??
-		                    content.Thumbnail;
-
-		content.AgeRatings = orderedResults.CombineDicts(x => x.AgeRatings ?? [], content.AgeRatings);
-
-		content.ReleasedAt =
-			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.ReleaseDate), out DateTimeOffset rDate)
-				? rDate
-				: content.ReleasedAt;
-		content.FinishedStreamingAt =
-			Utils.TryParseIsoString(orderedResults.FirstNonEmptyValue(x => x.FinishDate), out DateTimeOffset fDate)
-				? fDate
-				: content.FinishedStreamingAt;
-		content.UpdatedAt = DateTimeOffset.UtcNow;
+		await mm.RefreshMetadataOf(content, args.ProviderIds);
 
 		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
 		{
 			episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
 
-			Dictionary<string, MetadataEpisodeResult> unorderedEpisodeResults = [];
-			foreach ((string providerId, string id) in args.ProviderIds)
-			{
-				IEnumerable<MetadataEpisodeResult> results =
-					await pm.InvokeForPluginsWithPermission<MetadataEpisodeResult>($"metadata.provide.{providerId}",
-						"metadata.getTvEpisode", id, args.Season, args.Episode);
-				MetadataEpisodeResult? first = results.FirstOrDefault();
-				if (first == null) continue;
-				unorderedEpisodeResults[providerId] = first;
-			}
-
-			MetadataEpisodeResult[] orderedEpisodeResults = unorderedEpisodeResults.OrderBy(x =>
-			{
-				int index = config.Metadata.MetadataProviderOrder.IndexOf(x.Key);
-				return index != -1 ? index : int.MaxValue;
-			}).Select(x => x.Value).ToArray();
-
-			if (orderedEpisodeResults.Length == 0)
-				throw new Exception("None of the providers returned a result");
-
-			episode.Title = orderedEpisodeResults.FirstNonEmptyValue(x => x.Title) ?? episode.Title;
-			episode.Summary = orderedEpisodeResults.FirstNonEmptyValue(x => x.Summary) ?? episode.Summary;
-
-			episode.TranslatedTitle =
-				orderedEpisodeResults.CombineDicts(x => x.TitleTranslations ?? [], episode.TranslatedTitle);
-			episode.TranslatedSummary =
-				orderedEpisodeResults.CombineDicts(x => x.SummaryTranslations ?? [], episode.TranslatedSummary);
-
-			episode.Thumbnail = orderedEpisodeResults.CombineLists(x => x.Thumbnails ?? []).FirstOrDefault()?.Url ??
-			                    episode.Thumbnail;
-
-			episode.UpdatedAt = DateTimeOffset.UtcNow;
-			episode.ReleasedAt = Utils.TryParseIsoString(orderedEpisodeResults.FirstNonEmptyValue(x => x.ReleaseDate),
-				out DateTimeOffset erDate)
-				? erDate
-				: episode.ReleasedAt;
+			await mm.RefreshMetadataOf(episode, args.ProviderIds);
 
 			if (args.VideoId != null)
 			{
@@ -286,8 +139,6 @@ public class FetchMetadataJob : IJob
 			UpdatedAt = DateTimeOffset.UtcNow
 		};
 		db.Content.Add(existing);
-		foreach ((string providerId, string externalId) in providerIds)
-			SetExternalId(existing, providerId, externalId);
 		return existing;
 	}
 
@@ -310,31 +161,6 @@ public class FetchMetadataJob : IJob
 		};
 		db.Episode.Add(existing);
 		return existing;
-	}
-
-	private static void SetExternalId(DatabaseContent content, string providerId, string? externalId)
-	{
-		DatabaseContentExternalId? existing = content.ExternalIds
-			.FirstOrDefault(x => x.ProviderId == providerId);
-
-		if (string.IsNullOrWhiteSpace(externalId))
-		{
-			if (existing != null)
-				content.ExternalIds.Remove(existing);
-		}
-		else if (existing == null)
-		{
-			content.ExternalIds.Add(new DatabaseContentExternalId
-			{
-				ContentId = content.Id,
-				ProviderId = providerId,
-				ExternalId = externalId
-			});
-		}
-		else
-		{
-			existing.ExternalId = externalId;
-		}
 	}
 
 	public class Arguments
