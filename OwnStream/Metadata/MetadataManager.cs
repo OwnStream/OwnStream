@@ -32,7 +32,7 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 	{
 		MetadataEpisodeResult[] orderedResults =
 			await CallPlugins<MetadataEpisodeResult>(
-				JoinExternalIds(episode.ParentContent.ExternalIds, extraExternalIds), "metadata.getEpisode",
+				JoinExternalIds(episode.ParentContent.ExternalIds, extraExternalIds), "metadata.getTvEpisode",
 				episode.Season, episode.Episode);
 
 		episode.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? episode.Title;
@@ -185,7 +185,8 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		foreach ((string providerId, string id) in providerIds)
 		{
 			IEnumerable<T> results =
-				await pm.InvokeForPluginsWithPermission<T>($"metadata.provide.{providerId}", feature, id, extraArgs);
+				await pm.InvokeForPluginsWithPermission<T>($"metadata.provide.{providerId}", feature,
+					[id, .. extraArgs]);
 			T? first = results.FirstOrDefault();
 			if (first == null) continue;
 			unorderedResults[providerId] = first;
