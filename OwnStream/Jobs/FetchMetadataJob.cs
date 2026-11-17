@@ -4,10 +4,6 @@ using OwnStream.Database;
 using OwnStream.Database.Models;
 using OwnStream.Plugin;
 using OwnStream.PluginCore.ResultTypes;
-using TMDbLib.Client;
-using TMDbLib.Objects.General;
-using TMDbLib.Objects.Movies;
-using TMDbLib.Objects.TvShows;
 
 namespace OwnStream.Jobs;
 
@@ -17,7 +13,6 @@ public class FetchMetadataJob : IJob
 	private DatabaseContext db = null!;
 	private PluginManager pm = null!;
 	private Configuration config = null!;
-	private static bool providersReady = false;
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
