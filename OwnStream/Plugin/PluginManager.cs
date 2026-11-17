@@ -118,6 +118,17 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 		}
 	}
 
+	public void DeletePlugin(string path)
+	{
+		string pluginPath = Path.Join(config.PluginsPath, $"{path}.disabled");
+		string enabledPluginPath = Path.Join(config.PluginsPath, path);
+		if (!File.Exists(pluginPath))
+			throw new Exception(File.Exists(enabledPluginPath)
+				? "Please disable the plugin before deleting it."
+				: "Plugin not found.");
+		File.Delete(pluginPath);
+	}
+
 	private static LogLevel ToILoggerLevel(PluginHost.LogLevel level) => level switch
 	{
 		PluginHost.LogLevel.Debug => LogLevel.Debug,

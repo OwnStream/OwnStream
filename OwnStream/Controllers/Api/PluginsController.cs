@@ -57,4 +57,18 @@ public class PluginsController(PluginManager manager) : Controller
 			return new SuccessResponse<PluginMeta>(false, e.Message);
 		}
 	}
+
+	[HttpPost("delete")]
+	public SuccessResponse Delete([FromQuery] string path)
+	{
+		try
+		{
+			manager.DeletePlugin(path);
+			return new SuccessResponse(true);
+		}
+		catch (Exception e)
+		{
+			return new SuccessResponse(false, e.Message);
+		}
+	}
 }
