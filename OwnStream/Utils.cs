@@ -140,18 +140,21 @@ public static class Utils
 		items, Func<TItem, IEnumerable<TValue>> func) => items.SelectMany(func);
 
 	public static Dictionary<TKey, TValue> CombineDicts<TItem, TKey, TValue>(this IEnumerable<TItem> items,
-		Func<TItem, Dictionary<TKey, TValue>> func, Dictionary<TKey, TValue>? baseValue = null) where TKey : notnull
+		Func<TItem, Dictionary<TKey, TValue>> func, Dictionary<TKey, TValue>? baseValue = null,
+		TValue? ignoreIf = default) where TKey : notnull
 	{
 		Dictionary<TKey, TValue> result = [];
 		foreach (TItem item in items)
 		{
 			Dictionary<TKey, TValue> val = func.Invoke(item);
 			foreach ((TKey key, TValue value) in val)
-				result.TryAdd(key, value);
+				if (!EqualityComparer<TValue>.Default.Equals(value, ignoreIf))
+					result.TryAdd(key, value);
 		}
 
 		foreach ((TKey key, TValue value) in baseValue ?? [])
-			result.TryAdd(key, value);
+			if (!EqualityComparer<TValue>.Default.Equals(value, ignoreIf))
+				result.TryAdd(key, value);
 
 		return result;
 	}
@@ -161,8 +164,9 @@ public static class Utils
 		Default,
 		Date
 	}
-	
-	private static readonly string[] IsoFormats = {
+
+	private static readonly string[] IsoFormats =
+	{
 		"yyyy-MM-ddTHH:mm:ss.fffffffzzz",
 		"yyyy-MM-ddTHH:mm:sszzz",
 		"yyyy-MM-ddTHH:mm:ss'Z'",

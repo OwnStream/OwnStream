@@ -7,7 +7,8 @@ namespace OwnStream.Metadata;
 
 public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration config)
 {
-	public async Task<DatabaseContent> RefreshMetadataOf(DatabaseContent content, Dictionary<string, string>? extraExternalIds = null)
+	public async Task<DatabaseContent> RefreshMetadataOf(DatabaseContent content,
+		Dictionary<string, string>? extraExternalIds = null)
 	{
 		Dictionary<string, string> externalIds = JoinExternalIds(content.ExternalIds, extraExternalIds);
 		switch (content.Type)
@@ -26,7 +27,8 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		return content;
 	}
 
-	public async Task<DatabaseEpisode> RefreshMetadataOf(DatabaseEpisode episode, Dictionary<string, string>? extraExternalIds = null)
+	public async Task<DatabaseEpisode> RefreshMetadataOf(DatabaseEpisode episode,
+		Dictionary<string, string>? extraExternalIds = null)
 	{
 		MetadataEpisodeResult[] orderedResults =
 			await CallPlugins<MetadataEpisodeResult>(
@@ -36,10 +38,10 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		episode.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? episode.Title;
 		episode.Summary = orderedResults.FirstNonEmptyValue(x => x.Summary) ?? episode.Summary;
 
-		episode.TranslatedTitle = orderedResults
-			.CombineDicts(x => x.TitleTranslations ?? [], episode.TranslatedTitle);
-		episode.TranslatedSummary = orderedResults
-			.CombineDicts(x => x.SummaryTranslations ?? [], episode.TranslatedSummary);
+		episode.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [],
+			episode.TranslatedTitle, episode.Title);
+		episode.TranslatedSummary = orderedResults.CombineDicts(x => x.SummaryTranslations ?? [],
+			episode.TranslatedSummary, episode.Summary);
 
 		episode.Thumbnail = orderedResults.CombineLists(x => x.Thumbnails ?? []).FirstOrDefault()?.Url ??
 		                    episode.Thumbnail;
@@ -76,11 +78,12 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
 		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
 
-		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
-		content.TranslatedTagline =
-			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
-		content.TranslatedDescription =
-			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
+		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [],
+			content.TranslatedTitle, content.Title);
+		content.TranslatedTagline = orderedResults.CombineDicts(x => x.TaglineTranslations ?? [],
+			content.TranslatedTagline, content.Tagline);
+		content.TranslatedDescription = orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [],
+			content.TranslatedDescription, content.Description);
 
 		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
 		                 content.Poster;
@@ -114,11 +117,12 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		content.Tagline = orderedResults.FirstNonEmptyValue(x => x.Tagline) ?? content.Tagline;
 		content.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? content.Description;
 
-		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [], content.TranslatedTitle);
-		content.TranslatedTagline =
-			orderedResults.CombineDicts(x => x.TaglineTranslations ?? [], content.TranslatedTagline);
-		content.TranslatedDescription =
-			orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [], content.TranslatedDescription);
+		content.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [],
+			content.TranslatedTitle, content.Title);
+		content.TranslatedTagline = orderedResults.CombineDicts(x => x.TaglineTranslations ?? [],
+			content.TranslatedTagline, content.Tagline);
+		content.TranslatedDescription = orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [],
+			content.TranslatedDescription, content.Description);
 
 		content.Poster = orderedResults.CombineLists(x => x.Images?["poster"] ?? []).FirstOrDefault()?.Url ??
 		                 content.Poster;
