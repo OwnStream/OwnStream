@@ -153,6 +153,7 @@ if (app.Environment.IsDevelopment())
 	app.UseSwagger();
 	app.UseSwaggerUI(options =>
 	{
+		options.EnablePersistAuthorization();
 		options.EnableTryItOutByDefault();
 		options.SwaggerEndpoint("/swagger/v1/swagger.json", "OwnStream");
 	});
