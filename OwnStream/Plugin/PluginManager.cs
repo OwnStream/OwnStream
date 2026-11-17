@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text.Json;
 using OwnStream.PluginCore;
 using OwnStream.PluginCore.ResultTypes;
 
@@ -87,9 +89,33 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 		plugins.Remove(id);
 	}
 
-	public string[] ListLoadedPlugins()
+	public async Task<PluginMeta> InstallPlugin(Stream fileStream)
 	{
-		return plugins.Values.Select(x => x.Metadata.Id).ToArray();
+		string tmp = Path.GetTempFileName();
+		try
+		{
+			FileStream fs = new(tmp, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+			await fileStream.CopyToAsync(fs);
+
+			ZipArchive zip = new(fs);
+			PluginMeta meta = JsonSerializer.Deserialize<PluginMeta>(zip.Comment)!;
+			await zip.DisposeAsync();
+			fs.Close();
+
+			string pluginPath = Path.Join(config.PluginsPath, $"{meta.Id}.zip.disabled");
+			File.Move(tmp, pluginPath, true);
+			return meta;
+		}
+		catch (JsonException)
+		{
+			File.Delete(tmp);
+			throw new Exception("Invalid plugin file");
+		}
+		catch
+		{
+			File.Delete(tmp);
+			throw;
+		}
 	}
 
 	private static LogLevel ToILoggerLevel(PluginHost.LogLevel level) => level switch

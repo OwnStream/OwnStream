@@ -43,25 +43,18 @@ public class PluginsController(PluginManager manager) : Controller
 		}
 	}
 
-	[HttpPost("test")]
-	public async Task<SuccessResponse<IEnumerable<MetadataSearchResult>>> Test(
-		[FromBody] Dictionary<string, string> args)
+	[HttpPost("install")]
+	public async Task<SuccessResponse<PluginMeta>> Install(IFormFile file)
 	{
-		string query = args["query"]!;
-		string year = args["year"]!;
-		string type = args["type"]!;
-
 		try
 		{
-			IEnumerable<MetadataSearchResult[]> res =
-				await manager.InvokeForPluginsWithFeature<MetadataSearchResult[]>("metadata.search", type, query, int.Parse(year));
-			return new SuccessResponse<IEnumerable<MetadataSearchResult>>(true, "Plugin invoked successfully",
-				res!.SelectMany(x => x ?? []));
+			await using Stream fs = file.OpenReadStream();
+			PluginMeta meta = await manager.InstallPlugin(fs);
+			return new SuccessResponse<PluginMeta>(true, null, meta);
 		}
 		catch (Exception e)
 		{
-			Console.WriteLine(e);
-			return new SuccessResponse<IEnumerable<MetadataSearchResult>>(false, e.Message);
+			return new SuccessResponse<PluginMeta>(false, e.Message);
 		}
 	}
 }
