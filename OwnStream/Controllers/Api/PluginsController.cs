@@ -15,8 +15,8 @@ public class PluginsController(PluginManager manager) : Controller
 	[HttpGet("list")]
 	public IEnumerable<PluginItem> ListPlugins() => manager.GetAvailablePlugins().Select(x => new PluginItem(x));
 
-	[HttpGet("enable")]
-	public SuccessResponse EnablePlugin(string path)
+	[HttpPost("enable")]
+	public SuccessResponse EnablePlugin([FromQuery] string path)
 	{
 		try
 		{
@@ -29,8 +29,8 @@ public class PluginsController(PluginManager manager) : Controller
 		}
 	}
 
-	[HttpGet("disable")]
-	public SuccessResponse DisablePlugin(string path)
+	[HttpPost("disable")]
+	public SuccessResponse DisablePlugin([FromQuery] string path)
 	{
 		try
 		{
