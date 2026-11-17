@@ -129,6 +129,14 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 		File.Delete(pluginPath);
 	}
 
+	public void ReloadPlugin(string path)
+	{
+		string pluginPath = Path.Join(config.PluginsPath, path);
+		LoadedPlugin? loaded = plugins.Values.FirstOrDefault(x => x.Path == pluginPath);
+		if (loaded != null) UnloadPlugin(loaded.Id);
+		LoadPlugin(path);
+	}
+
 	private static LogLevel ToILoggerLevel(PluginHost.LogLevel level) => level switch
 	{
 		PluginHost.LogLevel.Debug => LogLevel.Debug,

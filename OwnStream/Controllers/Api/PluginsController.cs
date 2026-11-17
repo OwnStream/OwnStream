@@ -71,4 +71,18 @@ public class PluginsController(PluginManager manager) : Controller
 			return new SuccessResponse(false, e.Message);
 		}
 	}
+
+	[HttpPost("reload")]
+	public SuccessResponse Reload([FromQuery] string path)
+	{
+		try
+		{
+			manager.ReloadPlugin(path);
+			return new SuccessResponse(true);
+		}
+		catch (Exception e)
+		{
+			return new SuccessResponse(false, e.Message);
+		}
+	}
 }
