@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OwnStream.ApiModels.Requests;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
+using OwnStream.Metadata;
 
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/metadata"), EnableCors("Api"), Authorize(Roles = nameof(UserPermissions.WriteContent))]
-public class MetadataEditController(DatabaseContext db) : Controller
+public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Controller
 {
 	[HttpGet("content/{id:guid}")]
 	public ContentMetadataResponse? Get(Guid id)
@@ -23,6 +25,21 @@ public class MetadataEditController(DatabaseContext db) : Controller
 
 		DatabaseContentExternalId[] externalIds = db.ContentExternalIds.Where(x => x.ContentId == content.Id).ToArray();
 		return new ContentMetadataResponse(content, externalIds);
+	}
+
+	[HttpPost("content/{id:guid}/refresh")]
+	public async Task<ContentMetadataResponse?> RefreshContent(Guid id, bool apply = true)
+	{
+		DatabaseContent? content = db.Content.Include(x => x.ExternalIds).FirstOrDefault(x => x.Id == id);
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		DatabaseContent refreshed = await mm.RefreshMetadataOf(content);
+		if (apply) await db.SaveChangesAsync();
+		return new ContentMetadataResponse(refreshed, refreshed.ExternalIds.ToArray());
 	}
 
 	[HttpPatch("content/{id:guid}")]
@@ -164,6 +181,22 @@ public class MetadataEditController(DatabaseContext db) : Controller
 		}
 
 		return new EpisodeMetadataResponse(episode);
+	}
+
+	[HttpPost("episode/{id:guid}/refresh")]
+	public async Task<EpisodeMetadataResponse?> RefreshEpisode(Guid id, bool apply = true)
+	{
+		DatabaseEpisode? content = db.Episode.Include(x => x.ParentContent).ThenInclude(x => x.ExternalIds)
+			.FirstOrDefault(x => x.Id == id);
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		DatabaseEpisode refreshed = await mm.RefreshMetadataOf(content);
+		if (apply) await db.SaveChangesAsync();
+		return new EpisodeMetadataResponse(refreshed);
 	}
 
 	[HttpPatch("episode/{id:guid}")]
