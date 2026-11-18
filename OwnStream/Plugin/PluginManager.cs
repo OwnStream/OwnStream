@@ -200,7 +200,7 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 	{
 		MetadataSearchResult s => new MetadataSearchResult
 		{
-			Id = $"{pluginId}:{s.Id}", Titles = s.Titles, Poster = s.Poster, Year = s.Year
+			Id = $"{pluginId}:{s.Id}", Titles = s.Titles.Distinct().ToArray(), Poster = s.Poster, Year = s.Year
 		} as T,
 		MetadataSearchResult[] s => s.Select(x => PrependPluginIdToResult(pluginId, x)).ToArray() as T,
 		_ => result

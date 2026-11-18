@@ -7,11 +7,13 @@ using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 using OwnStream.Metadata;
+using OwnStream.Plugin;
+using OwnStream.PluginCore.ResultTypes;
 
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/metadata"), EnableCors("Api"), Authorize(Roles = nameof(UserPermissions.WriteContent))]
-public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Controller
+public class MetadataEditController(DatabaseContext db, MetadataManager mm, PluginManager pm) : Controller
 {
 	[HttpGet("content/{id:guid}")]
 	public ContentMetadataResponse? Get(Guid id)
@@ -67,6 +69,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					content.TranslatedTitle[key] = value;
 			}
+
 			db.Entry(content).Property(x => x.TranslatedTitle).IsModified = true;
 		}
 
@@ -79,6 +82,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					content.TranslatedTagline[key] = value;
 			}
+
 			db.Entry(content).Property(x => x.TranslatedTagline).IsModified = true;
 		}
 
@@ -91,6 +95,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					content.TranslatedDescription[key] = value;
 			}
+
 			db.Entry(content).Property(x => x.TranslatedDescription).IsModified = true;
 		}
 
@@ -113,6 +118,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					content.AgeRatings[kvp.Key] = kvp.Value;
 			}
+
 			db.Entry(content).Property(x => x.AgeRatings).IsModified = true;
 		}
 
@@ -224,6 +230,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					episode.TranslatedTitle[key] = value;
 			}
+
 			db.Entry(episode).Property(x => x.TranslatedTitle).IsModified = true;
 		}
 
@@ -236,6 +243,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 				else
 					episode.TranslatedSummary[key] = value;
 			}
+
 			db.Entry(episode).Property(x => x.TranslatedSummary).IsModified = true;
 		}
 
@@ -246,5 +254,43 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm) : Co
 
 		return new SuccessResponse<EpisodeMetadataResponse>(true, "Episode updated successfully.",
 			new EpisodeMetadataResponse(episode));
+	}
+
+	[HttpGet("search/{providerId}")]
+	public async Task<SuccessResponse<IEnumerable<PluginContentSearchResult>>> SearchProviders(string providerId,
+		[FromQuery] Guid contentId)
+	{
+		if (providerId.Contains('.'))
+		{
+			Response.StatusCode = 400;
+			return new SuccessResponse<IEnumerable<PluginContentSearchResult>>(false, "Bad provider ID");
+		}
+
+		DatabaseContent? content = await db.Content.FindAsync(contentId, HttpContext.RequestAborted);
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return new SuccessResponse<IEnumerable<PluginContentSearchResult>>(false, "Content not found");
+		}
+
+		try
+		{
+			IEnumerable<MetadataSearchResult[]> results =
+				await pm.InvokeForPluginsWithPermission<MetadataSearchResult[]>(
+					$"metadata.provide.{providerId}",
+					"metadata.search",
+					content.Type.ToString(),
+					content.Title,
+					content.ReleasedAt.Year
+				);
+			return new SuccessResponse<IEnumerable<PluginContentSearchResult>>(true,
+				$"Searched for {content.Title} ({content.ReleasedAt.Year}) under {content.Type.ToString()}",
+				results.SelectMany(l => l.Select(x => new PluginContentSearchResult(x))));
+		}
+		catch (Exception e)
+		{
+			Response.StatusCode = 500;
+			return new SuccessResponse<IEnumerable<PluginContentSearchResult>>(false, e.Message);
+		}
 	}
 }
