@@ -15,6 +15,11 @@ a forced trade of using more storage, while saving on compute.
 While importing items into the library, OwnStream scans all video files and detects similar sections to provide a "Skip
 Intro" button as a convenience.
 
+### Content Localization
+
+OwnStream stores localized content information for all languages it can find, which means all users can browse the
+library in their preferred language.
+
 ## Development
 
 OwnStream is built with .NET 10. For development of the main server, a copy of the .NET SDK is required.
