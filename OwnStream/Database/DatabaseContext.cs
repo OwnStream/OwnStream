@@ -19,6 +19,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseVideoSegment> VideoSegments { get; set; }
 	public DbSet<DatabaseContentExternalId> ContentExternalIds { get; set; }
 	public DbSet<DatabaseInputLibrary> InputLibraries { get; set; }
+	public DbSet<DatabaseSeason> Seasons { get; set; }
 
 	private static void PrepareDataSource()
 	{
@@ -55,6 +56,8 @@ public class DatabaseContext : DbContext
 		modelBuilder.Entity<DatabaseContent>().Property(x => x.AgeRatings).HasColumnType("jsonb");
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedTitle).HasColumnType("jsonb");
 		modelBuilder.Entity<DatabaseEpisode>().Property(x => x.TranslatedSummary).HasColumnType("jsonb");
+		modelBuilder.Entity<DatabaseSeason>().Property(x => x.TranslatedTitle).HasColumnType("jsonb");
+		modelBuilder.Entity<DatabaseSeason>().Property(x => x.TranslatedDescription).HasColumnType("jsonb");
 
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Episode).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.EpisodeId).OnDelete(DeleteBehavior.Cascade);
 		modelBuilder.Entity<DatabaseWatchProgress>().HasOne(x => x.Content).WithMany(x => x.WatchProgresses).HasForeignKey(x => x.ContentId).OnDelete(DeleteBehavior.Cascade);
@@ -69,6 +72,8 @@ public class DatabaseContext : DbContext
 			.WithMany(x => x.ExternalIds)
 			.HasForeignKey(x => x.ContentId)
 			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<DatabaseSeason>().HasKey(x => new { x.ContentId, x.Index });
 	}
 
 	public bool IsSetup() => Users.Any();

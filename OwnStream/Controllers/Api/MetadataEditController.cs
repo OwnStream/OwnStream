@@ -158,6 +158,135 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 			new ContentMetadataResponse(content, externalIds));
 	}
 
+	[HttpGet("content/{id:guid}/seasons")]
+	public IEnumerable<SeasonMetadataResponse>? GetSeasons(Guid id)
+	{
+		int[] available = db.Episode.Where(x => x.ParentContentId == id).Select(x => x.Season).Distinct().ToArray();
+		DatabaseContent? content = db.Content.Find(id);
+		if (content == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		Dictionary<int, SeasonMetadataResponse> map = db.Seasons
+			.Where(x => x.ContentId == id)
+			.ToDictionary(x => x.Index, x => new SeasonMetadataResponse(x));
+		return available.Select(i => map.GetValueOrDefault(i, new SeasonMetadataResponse(new DatabaseSeason
+		{
+			ContentId = id,
+			Index = i,
+			Title = $"Season {i}",
+			TranslatedTitle = [],
+			Description = "",
+			TranslatedDescription = [],
+			Poster = null,
+			CreatedAt = default,
+			UpdatedAt = default
+		})));
+	}
+
+	[HttpPost("content/{id:guid}/seasons/{index:int}/refresh")]
+	public async Task<SeasonMetadataResponse?> GetSeasons(Guid id, int index, bool apply = true)
+	{
+		DatabaseSeason? season = db.Seasons.FirstOrDefault(x => x.ContentId == id && x.Index == index);
+		Dictionary<string, string> externalIds = db.ContentExternalIds.Where(x => x.ContentId == id)
+			.ToDictionary(x => x.ProviderId, x => x.ExternalId);
+
+		if (season == null && db.Episode.Any(x => x.ParentContentId == id && x.Season == index))
+		{
+			season = new DatabaseSeason
+			{
+				ContentId = id,
+				Index = index,
+				Title = "",
+				TranslatedTitle = [],
+				Description = "",
+				TranslatedDescription = [],
+				Poster = null,
+				CreatedAt = DateTimeOffset.UtcNow,
+				UpdatedAt = DateTimeOffset.UtcNow
+			};
+			db.Seasons.Add(season);
+		}
+		else if (season == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		DatabaseSeason refreshed = await mm.RefreshMetadataOf(season, externalIds);
+		if (apply) await db.SaveChangesAsync();
+		return new SeasonMetadataResponse(refreshed);
+	}
+
+	[HttpPatch("content/{id:guid}/seasons/{index:int}")]
+	public SuccessResponse<SeasonMetadataResponse> Patch(Guid id, int index, [FromBody] SeasonMetadataEditRequest body)
+	{
+		DatabaseSeason? season = db.Seasons.FirstOrDefault(x => x.ContentId == id && x.Index == index);
+		Dictionary<string, string> externalIds = db.ContentExternalIds.Where(x => x.ContentId == id)
+			.ToDictionary(x => x.ProviderId, x => x.ExternalId);
+
+		if (season == null && db.Episode.Any(x => x.ParentContentId == id && x.Season == index))
+		{
+			season = new DatabaseSeason
+			{
+				ContentId = id,
+				Index = index,
+				Title = "",
+				TranslatedTitle = [],
+				Description = "",
+				TranslatedDescription = [],
+				Poster = null,
+				CreatedAt = DateTimeOffset.UtcNow,
+				UpdatedAt = DateTimeOffset.UtcNow
+			};
+			db.Seasons.Add(season);
+		}
+		else if (season == null)
+		{
+			Response.StatusCode = 404;
+			return new SuccessResponse<SeasonMetadataResponse>(false, $"Season {index} for content '{id}' not found");
+		}
+
+		if (body.Title != null) season.Title = body.Title;
+		if (body.Description != null) season.Description = body.Description;
+
+		if (body.TranslatedTitle != null)
+		{
+			foreach ((string key, string? value) in body.TranslatedTitle)
+			{
+				if (string.IsNullOrEmpty(value))
+					season.TranslatedTitle.Remove(key);
+				else
+					season.TranslatedTitle[key] = value;
+			}
+
+			db.Entry(season).Property(x => x.TranslatedTitle).IsModified = true;
+		}
+
+		if (body.TranslatedDescription != null)
+		{
+			foreach ((string key, string? value) in body.TranslatedDescription)
+			{
+				if (string.IsNullOrEmpty(value))
+					season.TranslatedDescription.Remove(key);
+				else
+					season.TranslatedDescription[key] = value;
+			}
+
+			db.Entry(season).Property(x => x.TranslatedDescription).IsModified = true;
+		}
+
+		if (body.Poster != null) season.Poster = body.Poster;
+
+		season.UpdatedAt = DateTimeOffset.UtcNow;
+		db.SaveChanges();
+
+		return new SuccessResponse<SeasonMetadataResponse>(true, "Season updated successfully.",
+			new SeasonMetadataResponse(season));
+	}
+
 	[HttpGet("content/{id:guid}/episodes")]
 	public IEnumerable<EpisodeMetadataResponse>? GetEpisodes(Guid id)
 	{

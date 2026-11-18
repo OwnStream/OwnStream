@@ -263,6 +263,44 @@ namespace OwnStream.Migrations
                     b.ToTable("Libraries");
                 });
 
+            modelBuilder.Entity("OwnStream.Database.Models.DatabaseSeason", b =>
+                {
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Index")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Poster")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Dictionary<string, string>>("TranslatedDescription")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Dictionary<string, string>>("TranslatedTitle")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ContentId", "Index");
+
+                    b.ToTable("Seasons");
+                });
+
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -472,6 +510,17 @@ namespace OwnStream.Migrations
                         .IsRequired();
 
                     b.Navigation("TranscodeLibrary");
+                });
+
+            modelBuilder.Entity("OwnStream.Database.Models.DatabaseSeason", b =>
+                {
+                    b.HasOne("OwnStream.Database.Models.DatabaseContent", "Content")
+                        .WithMany()
+                        .HasForeignKey("ContentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Content");
                 });
 
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseVideo", b =>

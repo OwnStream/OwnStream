@@ -54,6 +54,26 @@ public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration
 		return episode;
 	}
 
+	public async Task<DatabaseSeason> RefreshMetadataOf(DatabaseSeason season, Dictionary<string, string> externalIds)
+	{
+		MetadataSeasonResult[] orderedResults =
+			await CallPlugins<MetadataSeasonResult>(externalIds, "metadata.getTvSeason", season.Index);
+
+		season.Title = orderedResults.FirstNonEmptyValue(x => x.Title) ?? season.Title;
+		season.Description = orderedResults.FirstNonEmptyValue(x => x.Description) ?? season.Description;
+
+		season.TranslatedTitle = orderedResults.CombineDicts(x => x.TitleTranslations ?? [],
+			season.TranslatedTitle, season.Title);
+		season.TranslatedDescription = orderedResults.CombineDicts(x => x.DescriptionTranslations ?? [],
+			season.TranslatedDescription, season.Description);
+
+		season.Poster = orderedResults.CombineLists(x => x.Posters ?? []).FirstOrDefault()?.Url ??
+		                    season.Poster;
+
+		season.UpdatedAt = DateTimeOffset.UtcNow;
+		return season;
+	}
+
 	private static Dictionary<string, string> JoinExternalIds(IEnumerable<DatabaseContentExternalId> dbIds,
 		params Dictionary<string, string>?[] ids)
 	{

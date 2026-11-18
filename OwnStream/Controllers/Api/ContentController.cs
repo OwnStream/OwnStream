@@ -30,7 +30,7 @@ public class ContentController(DatabaseContext db) : Controller
 
 		int count = query.Count();
 		int pages = (int)Math.Ceiling(count / (float)limit);
-		
+
 		return new PagedResponse<Content>
 		{
 			Items = query
@@ -69,6 +69,10 @@ public class ContentController(DatabaseContext db) : Controller
 			.Include(x => x.Episodes)
 			.FirstOrDefault(x => x.Id == id);
 
+		Dictionary<int, DatabaseSeason> seasons = db.Seasons
+			.Where(x => x.ContentId == id)
+			.ToDictionary(x => x.Index, x => x);
+
 		if (content == null)
 		{
 			Response.StatusCode = 404;
@@ -77,11 +81,7 @@ public class ContentController(DatabaseContext db) : Controller
 
 		return content.Episodes
 			.GroupBy(x => x.Season)
-			.Select(x => new Season
-			{
-				Index = x.Key,
-				EpisodeCount = x.Count(),
-			})
+			.Select(x => new Season(x.Key, x.Count(), seasons.GetValueOrDefault(x.Key), HttpContext))
 			.OrderBy(x => x.Index)
 			.ToArray();
 	}
