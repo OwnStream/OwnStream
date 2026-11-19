@@ -51,16 +51,16 @@ public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 
 	public void DisablePlugin(string path)
 	{
+		string pluginPath = Path.Join(config.PluginsPath, path);
 		try
 		{
-			UnloadPlugin(plugins.First(x => x.Value.Path == path).Value.Id);
+			UnloadPlugin(plugins.First(x => x.Value.Path == pluginPath).Value.Id);
 		}
-		catch (KeyNotFoundException)
+		catch (InvalidOperationException)
 		{
 			// ignored
 		}
 
-		string pluginPath = Path.Join(config.PluginsPath, path);
 		string disabledPluginPath = Path.Join(config.PluginsPath, path + ".disabled");
 		if (!File.Exists(pluginPath))
 			throw new FileNotFoundException($"'{pluginPath}' was not found or is already disabled");

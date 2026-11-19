@@ -58,7 +58,7 @@ public class PluginsController(PluginManager manager) : Controller
 		}
 	}
 
-	[HttpPost("delete")]
+	[HttpDelete("delete")]
 	public SuccessResponse Delete([FromQuery] string path)
 	{
 		try
