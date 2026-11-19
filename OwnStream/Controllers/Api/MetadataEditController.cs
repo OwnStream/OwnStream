@@ -186,6 +186,34 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 		})));
 	}
 
+	[HttpGet("content/{id:guid}/seasons/{index:int}")]
+	public SeasonMetadataResponse? GetSeasons(Guid id, int index)
+	{
+		DatabaseSeason? dbSeason = db.Seasons.FirstOrDefault(x => x.ContentId == id && x.Index == index);
+		if (dbSeason == null && db.Episode.Any(x => x.ParentContentId == id && x.Season == index))
+		{
+			dbSeason = new DatabaseSeason
+			{
+				ContentId = id,
+				Index = index,
+				Title = $"Season {index}",
+				TranslatedTitle = [],
+				Description = "",
+				TranslatedDescription = [],
+				Poster = null,
+				CreatedAt = default,
+				UpdatedAt = default
+			};
+		}
+		else if (dbSeason == null)
+		{
+			Response.StatusCode = 404;
+			return null;
+		}
+
+		return new SeasonMetadataResponse(dbSeason);
+	}
+
 	[HttpPost("content/{id:guid}/seasons/{index:int}/refresh")]
 	public async Task<SeasonMetadataResponse?> GetSeasons(Guid id, int index, bool apply = true)
 	{
