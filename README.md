@@ -28,6 +28,8 @@ By default, `dotnet restore` will most likely fail due to the `OwnStream.PluginC
 Package Registry. To build and develop OwnStream, you should edit the `nuget.config` file at the project root to contain
 your GitHub username and a access token with the `packages:read` scope.
 
+To build the Docker image with `nuget.config`, run `docker buildx build --secret id=nuget_config,src=nuget.config -t ownstream .`
+
 Development is split to multiple repositories. **This is the backend server repository**, and by itself, it doesn't
 provide a usable UI. For a fuller development environment, visit the following repositories:
 
