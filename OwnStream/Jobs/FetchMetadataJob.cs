@@ -98,6 +98,12 @@ public class FetchMetadataJob : IJob
 		await mm.RefreshMetadataOf(content, args.ProviderIds);
 
 		DatabaseEpisode? episode = null;
+		if (args is { Season: not null })
+		{
+			DatabaseSeason season = await GetSeason(content.Id, args.Season.Value, cancellationToken);
+
+			await mm.RefreshMetadataOf(season, args.ProviderIds);
+		}
 		if (args is { Episode: not null, Season: not null })
 		{
 			episode = await GetEpisode(content.Id, args.Season.Value, args.Episode.Value, cancellationToken);
@@ -138,6 +144,27 @@ public class FetchMetadataJob : IJob
 			UpdatedAt = DateTimeOffset.UtcNow
 		};
 		db.Content.Add(existing);
+		return existing;
+	}
+
+	private async Task<DatabaseSeason> GetSeason(Guid parentContentId, int season, CancellationToken cancellationToken)
+	{
+		DatabaseSeason? existing = await db.Seasons.FirstOrDefaultAsync(
+			x => x.ContentId == parentContentId && x.Index == season,
+			cancellationToken: cancellationToken);
+		if (existing != null) return existing;
+
+		existing = new DatabaseSeason
+		{
+			ContentId = parentContentId,
+			Index = season,
+			Title = $"Season {season}",
+			Description = "",
+			Poster = null, 
+			CreatedAt = DateTimeOffset.UtcNow,
+			UpdatedAt = DateTimeOffset.UtcNow
+		};
+		db.Seasons.Add(existing);
 		return existing;
 	}
 
