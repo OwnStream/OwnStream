@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
@@ -13,12 +14,15 @@ using OwnStream.PluginCore.ResultTypes;
 namespace OwnStream.Controllers.Api;
 
 [ApiController, Route("/api/metadata"), EnableCors("Api"), Authorize(Roles = nameof(UserPermissions.WriteContent))]
-public class MetadataEditController(DatabaseContext db, MetadataManager mm, PluginManager pm) : Controller
+public partial class MetadataEditController(DatabaseContext db, MetadataManager mm, PluginManager pm) : Controller
 {
 	[HttpGet("content/{id:guid}")]
 	public ContentMetadataResponse? Get(Guid id)
 	{
-		DatabaseContent? content = db.Content.Find(id);
+		DatabaseContent? content = db.Content
+			.Include(x => x.ExternalIds)
+			.Include(x => x.Tags)
+			.FirstOrDefault(x => x.Id == id);
 		if (content == null)
 		{
 			Response.StatusCode = 404;
@@ -32,7 +36,10 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 	[HttpPost("content/{id:guid}/refresh")]
 	public async Task<ContentMetadataResponse?> RefreshContent(Guid id, bool apply = true)
 	{
-		DatabaseContent? content = db.Content.Include(x => x.ExternalIds).FirstOrDefault(x => x.Id == id);
+		DatabaseContent? content = db.Content
+			.Include(x => x.ExternalIds)
+			.Include(x => x.Tags)
+			.FirstOrDefault(x => x.Id == id);
 		if (content == null)
 		{
 			Response.StatusCode = 404;
@@ -47,8 +54,11 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 	[HttpPatch("content/{id:guid}")]
 	public SuccessResponse<ContentMetadataResponse> Patch(Guid id, [FromBody] ContentMetadataEditRequest body)
 	{
-		DatabaseContent? content = db.Content.Find(id);
-		DatabaseContentExternalId[] externalIds = db.ContentExternalIds.Where(x => x.ContentId == id).ToArray();
+		DatabaseContent? content = db.Content
+			.Include(x => x.ExternalIds)
+			.Include(x => x.Tags)
+			.FirstOrDefault(x => x.Id == id);
+		DatabaseContentExternalId[] externalIds = content?.ExternalIds.ToArray() ?? [];
 		if (content == null)
 		{
 			Response.StatusCode = 404;
@@ -148,6 +158,31 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 						});
 					}
 				}
+			}
+		}
+
+		if (body.Tags != null)
+		{
+			foreach (DatabaseContentTag tag in content.Tags)
+			{
+				if (body.Tags.Contains(tag.Tag)) continue;
+				db.ContentTags.Remove(tag);
+			}
+
+			foreach (string tag in body.Tags)
+			{
+				if (!TagRegex().IsMatch(tag))
+					return new SuccessResponse<ContentMetadataResponse>(false,
+						$"Invalid tag: {tag}. Tags can only contain lowercase letters, digits, and underscores");
+
+				if (content.Tags.Any(x => x.Tag == tag)) continue;
+				db.ContentTags.Add(new DatabaseContentTag
+				{
+					Id = Guid.NewGuid(),
+					ContentId = content.Id,
+					IsSystem = false,
+					Tag = tag
+				});
 			}
 		}
 
@@ -450,4 +485,7 @@ public class MetadataEditController(DatabaseContext db, MetadataManager mm, Plug
 			return new SuccessResponse<IEnumerable<PluginContentSearchResult>>(false, e.Message);
 		}
 	}
+
+    [GeneratedRegex(@"^[a-z0-9_]+$")]
+    private static partial Regex TagRegex();
 }

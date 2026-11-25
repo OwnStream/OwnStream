@@ -132,6 +132,29 @@ namespace OwnStream.Migrations
                     b.ToTable("ContentExternalIds");
                 });
 
+            modelBuilder.Entity("OwnStream.Database.Models.DatabaseContentTag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentId");
+
+                    b.ToTable("ContentTags");
+                });
+
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseEpisode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -506,6 +529,17 @@ namespace OwnStream.Migrations
                     b.Navigation("Content");
                 });
 
+            modelBuilder.Entity("OwnStream.Database.Models.DatabaseContentTag", b =>
+                {
+                    b.HasOne("OwnStream.Database.Models.DatabaseContent", "Content")
+                        .WithMany("Tags")
+                        .HasForeignKey("ContentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Content");
+                });
+
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseEpisode", b =>
                 {
                     b.HasOne("OwnStream.Database.Models.DatabaseContent", "ParentContent")
@@ -617,6 +651,8 @@ namespace OwnStream.Migrations
                     b.Navigation("Episodes");
 
                     b.Navigation("ExternalIds");
+
+                    b.Navigation("Tags");
 
                     b.Navigation("WatchProgresses");
                 });

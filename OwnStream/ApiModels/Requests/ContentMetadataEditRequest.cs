@@ -23,4 +23,5 @@ public class ContentMetadataEditRequest()
 
 	public Dictionary<string, string?>? AgeRatings { get; set; }
 	public Dictionary<string, string?>? ExternalIds { get; set; }
+	public IEnumerable<string>? Tags { get; set; }
 }

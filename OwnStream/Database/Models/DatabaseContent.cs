@@ -28,6 +28,7 @@ public class DatabaseContent
 	public ICollection<DatabaseContentExternalId> ExternalIds { get; } = new List<DatabaseContentExternalId>();
 	public ICollection<DatabaseEpisode> Episodes { get; } = new List<DatabaseEpisode>();
 	public ICollection<DatabaseWatchProgress> WatchProgresses { get; } = new List<DatabaseWatchProgress>();
+	public ICollection<DatabaseContentTag> Tags { get; } = new List<DatabaseContentTag>();
 	
 
 	public enum ContentType

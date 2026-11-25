@@ -26,4 +26,6 @@ public class ContentMetadataResponse(DatabaseContent content, DatabaseContentExt
 
 	public Dictionary<string, string> AgeRatings { get; set; } = content.AgeRatings;
 	public Dictionary<string, string> ExternalIds { get; set; } = externalIds.ToDictionary(x => x.ProviderId, x => x.ExternalId);
+	public IEnumerable<string> Tags { get; set; } = content.Tags.Where(x => !x.IsSystem).Select(x => x.Tag);
+	public IEnumerable<string> SystemTags { get; set; } = content.Tags.Where(x => x.IsSystem).Select(x => x.Tag);
 }

@@ -21,6 +21,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseInputLibrary> InputLibraries { get; set; }
 	public DbSet<DatabaseSeason> Seasons { get; set; }
 	public DbSet<DatabaseConfigEntry> ConfigEntries { get; set; }
+	public DbSet<DatabaseContentTag> ContentTags { get; set; }
 
 	private static void PrepareDataSource()
 	{
@@ -77,6 +78,8 @@ public class DatabaseContext : DbContext
 		modelBuilder.Entity<DatabaseSeason>().HasKey(x => new { x.ContentId, x.Index });
 
 		modelBuilder.Entity<DatabaseConfigEntry>().HasKey(x => new { x.Realm, x.Key });
+
+		modelBuilder.Entity<DatabaseContentTag>().HasOne(x => x.Content).WithMany(x => x.Tags).HasForeignKey(x => x.ContentId).OnDelete(DeleteBehavior.Cascade);
 	}
 
 	public bool IsSetup() => Users.Any();
