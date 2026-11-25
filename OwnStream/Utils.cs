@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using Konscious.Security.Cryptography;
 using Microsoft.Extensions.Primitives;
@@ -184,5 +186,68 @@ public static class Utils
 			CultureInfo.InvariantCulture,
 			DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
 			out result);
+	}
+
+	// i dont think this method belongs here but oh well
+	public static string? Which(string name)
+	{
+		if (Path.IsPathRooted(name) && File.Exists(name))
+			return Path.GetFullPath(name);
+
+		string? pathEnv = Environment.GetEnvironmentVariable("PATH");
+		if (string.IsNullOrEmpty(pathEnv))
+			return null;
+
+		string[] directories = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+
+		// Windows uses PATHEXT to know which file extensions are executable.
+		string[] extensions = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+			? GetPathextExtensions()
+			: new[] { string.Empty };
+
+		foreach (string directory in directories)
+		{
+			foreach (string ext in extensions)
+			{
+				string candidate = Path.Combine(directory, name + ext);
+				if (!File.Exists(candidate))
+					continue;
+
+				// On Unix-like systems, prefer files that have at least one execute bit.
+				if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !IsExecutable(candidate))
+					continue;
+
+				return Path.GetFullPath(candidate);
+			}
+		}
+
+		return null;
+	}
+
+	private static string[] GetPathextExtensions()
+	{
+		string? pathext = Environment.GetEnvironmentVariable("PATHEXT");
+		if (string.IsNullOrEmpty(pathext))
+			return new[] { ".exe", ".cmd", ".bat", ".com" };
+
+		return pathext.Split(';', StringSplitOptions.RemoveEmptyEntries)
+			.Select(e => e.StartsWith('.') ? e : "." + e)
+			.ToArray();
+	}
+
+	[UnsupportedOSPlatform("windows")]
+	private static bool IsExecutable(string path)
+	{
+		try
+		{
+			UnixFileMode mode = File.GetUnixFileMode(path);
+			return (mode & UnixFileMode.UserExecute) != 0 ||
+			       (mode & UnixFileMode.GroupExecute) != 0 ||
+			       (mode & UnixFileMode.OtherExecute) != 0;
+		}
+		catch
+		{
+			return false;
+		}
 	}
 }

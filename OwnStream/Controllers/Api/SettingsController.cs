@@ -3,6 +3,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
 using Xabe.FFmpeg;
@@ -60,6 +62,39 @@ public class SettingsController(DatabaseContext db, Configuration config) : Cont
 		config.Metadata = newConfig.Metadata;
 		config.SaveConfiguration();
 		return Json(config);
+	}
+
+	[HttpGet("doctor"), Authorize(Roles = nameof(UserPermissions.Admin))]
+	public DoctorResponse Doctor(bool skipFfmpeg = false)
+	{
+		// ReSharper disable once UseObjectOrCollectionInitializer
+		DoctorResponse response = new();
+
+		response.EpisodesWithMultipleVideos =
+			db.Episode.Include(x => x.Videos).Where(x => x.Videos.Count > 1).Select(x => x.Id);
+		response.EpisodesWithNoVideos =
+			db.Episode.Include(x => x.Videos).Where(x => x.Videos.Count == 0).Select(x => x.Id);
+		response.VideosWithNoEpisodes = db.Videos.Where(x => x.EpisodeId == null).Select(x => x.Id);
+
+		try
+		{
+			if (skipFfmpeg) throw new Exception();
+			response.FfmpegPath = Utils.Which(Path.Join(FFmpeg.ExecutablesPath, "ffmpeg"))!;
+			ProcessStartInfo psi = new(response.FfmpegPath, ["-version", "-hide_banner"])
+			{
+				RedirectStandardOutput = true
+			};
+			Process p = Process.Start(psi)!;
+			p.WaitForExit();
+			response.FfmpegVersion = p.StandardOutput.ReadToEnd().Split('\n')
+				.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+		}
+		catch (Exception)
+		{
+			response.FfmpegPath = null;
+			response.FfmpegVersion = null;
+		}
+		return response;
 	}
 
 	[HttpGet("benchmark"), Authorize(Roles = nameof(UserPermissions.Admin))]
