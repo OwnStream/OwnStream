@@ -1,4 +1,4 @@
-namespace OwnStream.Plugin;
+namespace OwnStream.Managers.Plugin;
 
 public class AvailablePlugin
 {

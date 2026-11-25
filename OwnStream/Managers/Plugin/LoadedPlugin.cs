@@ -1,6 +1,6 @@
 using OwnStream.PluginCore;
 
-namespace OwnStream.Plugin;
+namespace OwnStream.Managers.Plugin;
 
 public class LoadedPlugin(string path) : IDisposable
 {

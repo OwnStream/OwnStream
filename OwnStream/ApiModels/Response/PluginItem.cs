@@ -1,4 +1,4 @@
-using OwnStream.Plugin;
+using OwnStream.Managers.Plugin;
 
 namespace OwnStream.ApiModels.Response;
 

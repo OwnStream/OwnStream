@@ -2,7 +2,7 @@ using System.IO.Compression;
 using Octokit;
 using FileMode = System.IO.FileMode;
 
-namespace OwnStream;
+namespace OwnStream.Managers;
 
 public class FrontendManager(ILogger<FrontendManager> logger)
 {

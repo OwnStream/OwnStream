@@ -6,8 +6,8 @@ using OwnStream.ApiModels.Requests;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
-using OwnStream.Metadata;
-using OwnStream.Plugin;
+using OwnStream.Managers;
+using OwnStream.Managers.Plugin;
 using OwnStream.PluginCore.ResultTypes;
 
 namespace OwnStream.Controllers.Api;

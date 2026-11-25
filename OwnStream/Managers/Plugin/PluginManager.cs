@@ -3,7 +3,7 @@ using System.Text.Json;
 using OwnStream.PluginCore;
 using OwnStream.PluginCore.ResultTypes;
 
-namespace OwnStream.Plugin;
+namespace OwnStream.Managers.Plugin;
 
 public class PluginManager(ILogger<PluginManager> logger, Configuration config)
 {

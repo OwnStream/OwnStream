@@ -1,9 +1,9 @@
 using OwnStream.Database;
 using OwnStream.Database.Models;
-using OwnStream.Plugin;
+using OwnStream.Managers.Plugin;
 using OwnStream.PluginCore.ResultTypes;
 
-namespace OwnStream.Metadata;
+namespace OwnStream.Managers;
 
 public class MetadataManager(DatabaseContext db, PluginManager pm, Configuration config)
 {

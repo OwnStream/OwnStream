@@ -5,8 +5,8 @@ using OwnStream.Database;
 using OwnStream.Database.Models;
 using OwnStream.Jobs;
 using OwnStream.JsonConverter;
-using OwnStream.Metadata;
-using OwnStream.Plugin;
+using OwnStream.Managers;
+using OwnStream.Managers.Plugin;
 using OwnStream.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);

@@ -2,8 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OwnStream.Database;
 using OwnStream.Database.Models;
-using OwnStream.Metadata;
-using OwnStream.Plugin;
+using OwnStream.Managers;
 
 namespace OwnStream.Jobs;
 

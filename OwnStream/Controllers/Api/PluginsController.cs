@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database.Models;
-using OwnStream.Plugin;
+using OwnStream.Managers.Plugin;
 using OwnStream.PluginCore;
 using OwnStream.PluginCore.ResultTypes;
 
