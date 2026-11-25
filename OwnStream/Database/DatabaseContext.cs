@@ -20,6 +20,7 @@ public class DatabaseContext : DbContext
 	public DbSet<DatabaseContentExternalId> ContentExternalIds { get; set; }
 	public DbSet<DatabaseInputLibrary> InputLibraries { get; set; }
 	public DbSet<DatabaseSeason> Seasons { get; set; }
+	public DbSet<DatabaseConfigEntry> ConfigEntries { get; set; }
 
 	private static void PrepareDataSource()
 	{
@@ -74,6 +75,8 @@ public class DatabaseContext : DbContext
 			.OnDelete(DeleteBehavior.Cascade);
 
 		modelBuilder.Entity<DatabaseSeason>().HasKey(x => new { x.ContentId, x.Index });
+
+		modelBuilder.Entity<DatabaseConfigEntry>().HasKey(x => new { x.Realm, x.Key });
 	}
 
 	public bool IsSetup() => Users.Any();

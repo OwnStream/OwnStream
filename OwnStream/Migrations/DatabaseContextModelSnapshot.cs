@@ -23,6 +23,22 @@ namespace OwnStream.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("OwnStream.Database.Models.DatabaseConfigEntry", b =>
+                {
+                    b.Property<string>("Realm")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Key")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text");
+
+                    b.HasKey("Realm", "Key");
+
+                    b.ToTable("ConfigEntries");
+                });
+
             modelBuilder.Entity("OwnStream.Database.Models.DatabaseContent", b =>
                 {
                     b.Property<Guid>("Id")
