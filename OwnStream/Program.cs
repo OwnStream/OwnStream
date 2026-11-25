@@ -36,6 +36,7 @@ builder.Services.AddSingleton<JobCancellationService>();
 builder.Services.AddSingleton<FrontendManager>();
 builder.Services.AddSingleton<PluginManager>();
 builder.Services.AddScoped<MetadataManager>();
+builder.Services.AddScoped<TagManager>();
 builder.Services.AddScoped<IFfmpegJobQueueService, FfmpegJobQueueService>();
 builder.Services.AddHostedService<FfmpegJobBackgroundService>();
 builder.Services.AddCors(options =>

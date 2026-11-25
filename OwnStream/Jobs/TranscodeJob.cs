@@ -485,6 +485,7 @@ public class TranscodeJob : IJob
 		IMediaInfo info = await FFmpeg.GetMediaInfo(Path.Join(job.OutputPath, "master.m3u8"), cancellationToken);
 		IVideoStream bestVideoStream = info.VideoStreams.MaxBy(x => x.Width)!;
 		string lang = string.Join(",", media.AudioStreams.Select(x => x.Language));
+		string subLang = string.Join(",", subtitles.Select(x => x.Language));
 		if (lang.Length == 0) lang = "und";
 
 		DatabaseVideo dbVideo = new()
@@ -496,6 +497,7 @@ public class TranscodeJob : IJob
 			Fps = (int)Math.Round(bestVideoStream.Framerate),
 			Length = (int)Math.Round(bestVideoStream.Duration.TotalMilliseconds),
 			Language = lang,
+			SubtitleLanguages = subLang,
 			LibraryId = args.LibraryId,
 			Size = size
 		};

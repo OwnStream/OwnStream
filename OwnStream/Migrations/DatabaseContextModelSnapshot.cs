@@ -397,6 +397,10 @@ namespace OwnStream.Migrations
                     b.Property<long>("Size")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("SubtitleLanguages")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("Width")
                         .HasColumnType("integer");
 

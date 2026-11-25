@@ -11,11 +11,13 @@ public class FetchMetadataJob : IJob
 {
 	private DatabaseContext db = null!;
 	private MetadataManager mm = null!;
+	private TagManager tm = null!;
 
 	public void Initialize(IServiceProvider serviceProvider)
 	{
 		db = serviceProvider.GetRequiredService<DatabaseContext>();
 		mm = serviceProvider.GetRequiredService<MetadataManager>();
+		tm = serviceProvider.GetRequiredService<TagManager>();
 	}
 
 	public async Task ExecuteJob(Guid jobId, CancellationToken cancellationToken)
@@ -59,6 +61,7 @@ public class FetchMetadataJob : IJob
 
 		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Movie, args.LibraryId);
 		await mm.RefreshMetadataOf(content, args.ProviderIds);
+		tm.RecalculateSystemTagsFor(content);
 
 		DatabaseEpisode? episode = null;
 		if (args is { Episode: not null, Season: not null })
@@ -69,10 +72,11 @@ public class FetchMetadataJob : IJob
 			episode.UpdatedAt = DateTimeOffset.UtcNow;
 			episode.ReleasedAt = content.ReleasedAt;
 
-			if (args.VideoId != null)
+			DatabaseVideo? video = await db.Videos.FindAsync([args.VideoId], cancellationToken);
+			if (video != null)
 			{
-				DatabaseVideo? video = await db.Videos.FindAsync([args.VideoId], cancellationToken);
-				video?.EpisodeId = episode.Id;
+				video.EpisodeId = episode.Id;
+				tm.RecalculateSystemTagsFor(video, true, content.Id);
 			}
 		}
 
@@ -96,6 +100,7 @@ public class FetchMetadataJob : IJob
 
 		DatabaseContent content = GetContent(args.ProviderIds, DatabaseContent.ContentType.Tv, args.LibraryId);
 		await mm.RefreshMetadataOf(content, args.ProviderIds);
+		tm.RecalculateSystemTagsFor(content);
 
 		DatabaseEpisode? episode = null;
 		if (args is { Season: not null })
@@ -110,10 +115,11 @@ public class FetchMetadataJob : IJob
 
 			await mm.RefreshMetadataOf(episode, args.ProviderIds);
 
-			if (args.VideoId != null)
+			DatabaseVideo? video = await db.Videos.FindAsync([args.VideoId], cancellationToken);
+			if (video != null)
 			{
-				DatabaseVideo? video = await db.Videos.FindAsync([args.VideoId], cancellationToken);
-				video?.EpisodeId = episode.Id;
+				video.EpisodeId = episode.Id;
+				tm.RecalculateSystemTagsFor(video, true, content.Id);
 			}
 		}
 

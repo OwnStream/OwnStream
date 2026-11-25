@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using OwnStream.ApiModels.Requests;
 using OwnStream.ApiModels.Response;
 using OwnStream.Database;
 using OwnStream.Database.Models;
@@ -103,6 +104,26 @@ public class JobsController(DatabaseContext db, JobCancellationService jobCancel
 		job.Message = $"Cancelled by user {HttpContext.User.FindFirstValue(ClaimTypes.Name)}\n{job.Message}";
 		db.SaveChanges();
 
+		return new SuccessResponse<Job>(true, "", new Job(job));
+	}
+
+	[HttpPost("new"),
+	 Authorize(Roles = nameof(UserPermissions.WriteJobs))]
+	public SuccessResponse<Job> StartJob(CreateJobRequest request)
+	{
+		DatabaseFfmpegJob job = new()
+		{
+			Id = Guid.NewGuid(),
+			JobType = request.JobType,
+			InputPath = request.InputPath,
+			OutputPath = request.OutputPath,
+			Arguments = request.Arguments,
+			Status = DatabaseFfmpegJob.JobStatus.Pending,
+			Message = $"Queued by user {HttpContext.User.FindFirstValue(ClaimTypes.Name)}"
+		};
+
+		db.FfmpegJobs.Add(job);
+		db.SaveChanges();
 		return new SuccessResponse<Job>(true, "", new Job(job));
 	}
 }
