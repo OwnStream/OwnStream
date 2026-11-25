@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
@@ -31,5 +32,34 @@ public class AuthController(DatabaseContext db) : Controller
 		DatabaseUser? user =
 			db.Users.Find(Guid.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value));
 		return new User(user!);
+	}
+
+	[HttpPost("changePassword"), Authorize]
+	public SuccessResponse ChangePassword([FromBody] ChangePasswordRequest request)
+	{
+		DatabaseUser? user =
+			db.Users.Find(Guid.Parse(User.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value));
+		if (user == null)
+		{
+			Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+			return new SuccessResponse(false, "User not found");
+		}
+
+		if (!user.PasswordHash.SequenceEqual(Utils.GetPasswordHash(user.Username, request.CurrentPassword)))
+		{
+			Response.StatusCode = (int)HttpStatusCode.BadRequest;
+			return new SuccessResponse(false,
+				"Current password is invalid. If you've forgotten your password, please contact the instance administrator.");
+		}
+
+		if (request.CurrentPassword == request.NewPassword)
+		{
+			Response.StatusCode = (int)HttpStatusCode.BadRequest;
+			return new SuccessResponse(false, "New password cannot be the same as the old one.");
+		}
+
+		user.PasswordHash = Utils.GetPasswordHash(user.Username, request.NewPassword);
+		db.SaveChanges();
+		return new SuccessResponse(true, "Password changed");
 	}
 }
